@@ -11,7 +11,7 @@ import { PerformersCriterionOption } from "./criteria/performers";
 import { ListFilterOptions } from "./filter-options";
 import { DisplayMode } from "./types";
 
-const defaultSortBy = "name";
+const defaultSortBy = "random";
 
 const sortByOptions = ["name", "random", "date", "duration", "rating"]
   .map(ListFilterOptions.createSortBy)
