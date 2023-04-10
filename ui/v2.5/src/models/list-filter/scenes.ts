@@ -29,7 +29,7 @@ import { PerformerFavoriteCriterionOption } from "./criteria/favorite";
 import { CaptionsCriterionOption } from "./criteria/captions";
 import { StashIDCriterionOption } from "./criteria/stash-ids";
 
-const defaultSortBy = "date";
+const defaultSortBy = "random";
 const sortByOptions = [
   "organized",
   "o_counter",
