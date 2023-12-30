@@ -5,9 +5,8 @@ import (
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
-	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/plugin"
-	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
+	"github.com/stashapp/stash/pkg/sliceutil"
 )
 
 func (r *mutationResolver) RunPluginTask(ctx context.Context, pluginID string, taskName string, args []*plugin.PluginArgInput) (string, error) {
@@ -17,11 +16,7 @@ func (r *mutationResolver) RunPluginTask(ctx context.Context, pluginID string, t
 }
 
 func (r *mutationResolver) ReloadPlugins(ctx context.Context) (bool, error) {
-	err := manager.GetInstance().PluginCache.LoadPlugins()
-	if err != nil {
-		logger.Errorf("Error reading plugin configs: %v", err)
-	}
-
+	manager.GetInstance().RefreshPluginCache()
 	return true, nil
 }
 
@@ -41,7 +36,7 @@ func (r *mutationResolver) SetPluginsEnabled(ctx context.Context, enabledMap map
 	// add plugins that are newly disabled
 	for pluginID, enabled := range enabledMap {
 		if !enabled {
-			newDisabled = stringslice.StrAppendUnique(newDisabled, pluginID)
+			newDisabled = sliceutil.AppendUnique(newDisabled, pluginID)
 		}
 	}
 

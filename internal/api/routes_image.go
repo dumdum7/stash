@@ -8,7 +8,8 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/file"
@@ -28,14 +29,6 @@ type imageRoutes struct {
 	routes
 	imageFinder ImageFinder
 	fileGetter  models.FileGetter
-}
-
-func getImageRoutes(repo models.Repository) chi.Router {
-	return imageRoutes{
-		routes:      routes{txnManager: repo.TxnManager},
-		imageFinder: repo.Image,
-		fileGetter:  repo.File,
-	}.Routes()
 }
 
 func (rs imageRoutes) Routes() chi.Router {
@@ -75,7 +68,7 @@ func (rs imageRoutes) Thumbnail(w http.ResponseWriter, r *http.Request) {
 			Preset:     manager.GetInstance().Config.GetPreviewPreset().String(),
 		}
 
-		encoder := image.NewThumbnailEncoder(manager.GetInstance().FFMPEG, manager.GetInstance().FFProbe, clipPreviewOptions)
+		encoder := image.NewThumbnailEncoder(manager.GetInstance().FFMpeg, manager.GetInstance().FFProbe, clipPreviewOptions)
 		data, err := encoder.GetThumbnail(f, models.DefaultGthumbWidth)
 		if err != nil {
 			// don't log for unsupported image format

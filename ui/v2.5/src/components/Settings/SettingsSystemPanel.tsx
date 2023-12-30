@@ -10,7 +10,7 @@ import {
   StringListSetting,
   StringSetting,
 } from "./Inputs";
-import { SettingStateContext } from "./context";
+import { useSettings } from "./context";
 import {
   VideoPreviewInput,
   VideoPreviewSettingsInput,
@@ -20,8 +20,7 @@ import { useIntl } from "react-intl";
 export const SettingsConfigurationPanel: React.FC = () => {
   const intl = useIntl();
 
-  const { general, loading, error, saveGeneral } =
-    React.useContext(SettingStateContext);
+  const { general, loading, error, saveGeneral } = useSettings();
 
   const transcodeQualities = [
     GQL.StreamingResolutionEnum.Low,
@@ -136,6 +135,14 @@ export const SettingsConfigurationPanel: React.FC = () => {
           subHeadingID="config.general.scrapers_path.description"
           value={general.scrapersPath ?? undefined}
           onChange={(v) => saveGeneral({ scrapersPath: v })}
+        />
+
+        <StringSetting
+          id="plugins-path"
+          headingID="config.general.plugins_path.heading"
+          subHeadingID="config.general.plugins_path.description"
+          value={general.pluginsPath ?? undefined}
+          onChange={(v) => saveGeneral({ pluginsPath: v })}
         />
 
         <StringSetting

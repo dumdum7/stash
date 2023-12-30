@@ -8,7 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/ffmpeg"
@@ -48,17 +49,6 @@ type sceneRoutes struct {
 	captionFinder     CaptionFinder
 	sceneMarkerFinder SceneMarkerFinder
 	tagFinder         SceneMarkerTagFinder
-}
-
-func getSceneRoutes(repo models.Repository) chi.Router {
-	return sceneRoutes{
-		routes:            routes{txnManager: repo.TxnManager},
-		sceneFinder:       repo.Scene,
-		fileGetter:        repo.File,
-		captionFinder:     repo.File,
-		sceneMarkerFinder: repo.SceneMarker,
-		tagFinder:         repo.Tag,
-	}.Routes()
 }
 
 func (rs sceneRoutes) Routes() chi.Router {

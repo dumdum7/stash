@@ -13,21 +13,84 @@ import { CollapseButton } from "../Shared/CollapseButton";
 import { Icon } from "../Shared/Icon";
 import { LoadingIndicator } from "../Shared/LoadingIndicator";
 import { SettingSection } from "./SettingSection";
-import { Setting, SettingGroup } from "./Inputs";
+import {
+  BooleanSetting,
+  NumberSetting,
+  Setting,
+  SettingGroup,
+  StringSetting,
+} from "./Inputs";
 import { faLink, faSyncAlt } from "@fortawesome/free-solid-svg-icons";
+import { useSettings } from "./context";
+import {
+  AvailablePluginPackages,
+  InstalledPluginPackages,
+} from "./PluginPackageManager";
+
+interface IPluginSettingProps {
+  pluginID: string;
+  setting: GQL.PluginSetting;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}
+
+const PluginSetting: React.FC<IPluginSettingProps> = ({
+  pluginID,
+  setting,
+  value,
+  onChange,
+}) => {
+  const commonProps = {
+    heading: setting.display_name ? setting.display_name : setting.name,
+    id: `plugin-${pluginID}-${setting.name}`,
+    subHeading: setting.description ?? undefined,
+  };
+
+  switch (setting.type) {
+    case GQL.PluginSettingTypeEnum.Boolean:
+      return (
+        <BooleanSetting
+          {...commonProps}
+          checked={(value as boolean) ?? false}
+          onChange={() => onChange(!value)}
+        />
+      );
+    case GQL.PluginSettingTypeEnum.String:
+      return (
+        <StringSetting
+          {...commonProps}
+          value={(value as string) ?? ""}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case GQL.PluginSettingTypeEnum.Number:
+      return (
+        <NumberSetting
+          {...commonProps}
+          value={(value as number) ?? 0}
+          onChange={(v) => onChange(v)}
+        />
+      );
+  }
+};
 
 export const SettingsPluginsPanel: React.FC = () => {
   const Toast = useToast();
   const intl = useIntl();
 
+  const { loading: configLoading, plugins, savePluginSettings } = useSettings();
+  const { data, loading } = usePlugins();
+
   const [changedPluginID, setChangedPluginID] = React.useState<
     string | undefined
   >();
 
-  const { data, loading, refetch } = usePlugins();
-
   async function onReloadPlugins() {
-    await mutateReloadPlugins().catch((e) => Toast.error(e));
+    try {
+      await mutateReloadPlugins();
+    } catch (e) {
+      Toast.error(e);
+    }
   }
 
   const pluginElements = useMemo(() => {
@@ -50,12 +113,13 @@ export const SettingsPluginsPanel: React.FC = () => {
 
     function renderEnableButton(pluginID: string, enabled: boolean) {
       async function onClick() {
-        await mutateSetPluginsEnabled({ [pluginID]: !enabled }).catch((e) =>
-          Toast.error(e)
-        );
+        try {
+          await mutateSetPluginsEnabled({ [pluginID]: !enabled });
+        } catch (e) {
+          Toast.error(e);
+        }
 
         setChangedPluginID(pluginID);
-        refetch();
       }
 
       return (
@@ -101,6 +165,7 @@ export const SettingsPluginsPanel: React.FC = () => {
           }
         >
           {renderPluginHooks(plugin.hooks ?? undefined)}
+          {renderPluginSettings(plugin.id, plugin.settings ?? [])}
         </SettingGroup>
       ));
 
@@ -145,13 +210,45 @@ export const SettingsPluginsPanel: React.FC = () => {
       );
     }
 
-    return renderPlugins();
-  }, [data?.plugins, intl, Toast, changedPluginID, refetch]);
+    function renderPluginSettings(
+      pluginID: string,
+      settings: GQL.PluginSetting[]
+    ) {
+      const pluginSettings = plugins[pluginID] ?? {};
 
-  if (loading) return <LoadingIndicator />;
+      return settings.map((setting) => (
+        <PluginSetting
+          key={setting.name}
+          pluginID={pluginID}
+          setting={setting}
+          value={pluginSettings[setting.name]}
+          onChange={(v) =>
+            savePluginSettings(pluginID, {
+              ...pluginSettings,
+              [setting.name]: v,
+            })
+          }
+        />
+      ));
+    }
+
+    return renderPlugins();
+  }, [
+    data?.plugins,
+    intl,
+    Toast,
+    changedPluginID,
+    plugins,
+    savePluginSettings,
+  ]);
+
+  if (loading || configLoading) return <LoadingIndicator />;
 
   return (
     <>
+      <InstalledPluginPackages />
+      <AvailablePluginPackages />
+
       <SettingSection headingID="config.categories.plugins">
         <Setting headingID="actions.reload_plugins">
           <Button onClick={() => onReloadPlugins()}>

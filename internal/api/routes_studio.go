@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
@@ -21,13 +22,6 @@ type StudioFinder interface {
 type studioRoutes struct {
 	routes
 	studioFinder StudioFinder
-}
-
-func getStudioRoutes(repo models.Repository) chi.Router {
-	return studioRoutes{
-		routes:       routes{txnManager: repo.TxnManager},
-		studioFinder: repo.Studio,
-	}.Routes()
 }
 
 func (rs studioRoutes) Routes() chi.Router {

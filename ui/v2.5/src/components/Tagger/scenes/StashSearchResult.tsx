@@ -14,7 +14,7 @@ import { SuccessIcon } from "src/components/Shared/SuccessIcon";
 import { TagSelect } from "src/components/Shared/Select";
 import { TruncatedText } from "src/components/Shared/TruncatedText";
 import { OperationButton } from "src/components/Shared/OperationButton";
-import FormUtils from "src/utils/form";
+import * as FormUtils from "src/utils/form";
 import { stringToGender } from "src/utils/gender";
 import { IScrapedScene, TaggerStateContext } from "../context";
 import { OptionalField } from "../IncludeButton";
@@ -363,15 +363,20 @@ const StashSearchResult: React.FC<IStashSearchResultProps> = ({
       ),
       studio_id: studioID,
       cover_image: resolveField("cover_image", undefined, imgData),
-      urls: resolveField("url", stashScene.urls, scene.urls),
       tag_ids: tagIDs,
       stash_ids: stashScene.stash_ids ?? [],
       code: resolveField("code", stashScene.code, scene.code),
       director: resolveField("director", stashScene.director, scene.director),
     };
 
-    const includeStashID = !excludedFieldList.includes("stash_ids");
+    const includeUrl = !excludedFieldList.includes("url");
+    if (includeUrl && scene.urls) {
+      sceneCreateInput.urls = uniq(stashScene.urls.concat(scene.urls));
+    } else {
+      sceneCreateInput.urls = stashScene.urls;
+    }
 
+    const includeStashID = !excludedFieldList.includes("stash_ids");
     if (
       includeStashID &&
       currentSource?.stashboxEndpoint &&

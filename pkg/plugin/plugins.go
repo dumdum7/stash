@@ -15,33 +15,74 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/common"
 	"github.com/stashapp/stash/pkg/session"
-	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
+	"github.com/stashapp/stash/pkg/sliceutil"
 	"github.com/stashapp/stash/pkg/txn"
+	"github.com/stashapp/stash/pkg/utils"
 )
 
 type Plugin struct {
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	Description *string       `json:"description"`
-	URL         *string       `json:"url"`
-	Version     *string       `json:"version"`
-	Tasks       []*PluginTask `json:"tasks"`
-	Hooks       []*PluginHook `json:"hooks"`
-	UI          PluginUI      `json:"ui"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description"`
+	URL         *string         `json:"url"`
+	Version     *string         `json:"version"`
+	Tasks       []*PluginTask   `json:"tasks"`
+	Hooks       []*PluginHook   `json:"hooks"`
+	UI          PluginUI        `json:"ui"`
+	Settings    []PluginSetting `json:"settings"`
 
 	Enabled bool `json:"enabled"`
+
+	// ConfigPath is the path to the plugin's configuration file.
+	ConfigPath string `json:"-"`
 }
 
 type PluginUI struct {
+	// Requires is a list of plugin IDs that this plugin depends on.
+	// These plugins will be loaded before this plugin.
+	Requires []string `json:"requires"`
+
+	// Content Security Policy configuration for the plugin.
+	CSP PluginCSP `json:"csp"`
+
+	// External Javascript files that will be injected into the stash UI.
+	ExternalScript []string `json:"external_script"`
+
+	// External CSS files that will be injected into the stash UI.
+	ExternalCSS []string `json:"external_css"`
+
 	// Javascript files that will be injected into the stash UI.
 	Javascript []string `json:"javascript"`
 
 	// CSS files that will be injected into the stash UI.
 	CSS []string `json:"css"`
+
+	// Assets is a map of URL prefixes to hosted directories.
+	// This allows plugins to serve static assets from a URL path.
+	// Plugin assets are exposed via the /plugin/{pluginId}/assets path.
+	// For example, if the plugin configuration file contains:
+	// /foo: bar
+	// /bar: baz
+	// /: root
+	// Then the following requests will be mapped to the following files:
+	// /plugin/{pluginId}/assets/foo/file.txt -> {pluginDir}/foo/file.txt
+	// /plugin/{pluginId}/assets/bar/file.txt -> {pluginDir}/baz/file.txt
+	// /plugin/{pluginId}/assets/file.txt -> {pluginDir}/root/file.txt
+	Assets utils.URLMap `json:"assets"`
+}
+
+type PluginSetting struct {
+	Name string `json:"name"`
+	// defaults to string
+	Type PluginSettingTypeEnum `json:"type"`
+	// defaults to key name
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
 }
 
 type ServerConfig interface {
@@ -83,46 +124,31 @@ func (c *Cache) RegisterSessionStore(sessionStore *session.Store) {
 	c.sessionStore = sessionStore
 }
 
-// LoadPlugins clears the plugin cache and loads from the plugin path.
-// In the event of an error during loading, the cache will be left empty.
-func (c *Cache) LoadPlugins() error {
-	c.plugins = nil
-	plugins, err := loadPlugins(c.config.GetPluginsPath())
-	if err != nil {
-		return err
-	}
-
-	c.plugins = plugins
-	return nil
-}
-
-func loadPlugins(path string) ([]Config, error) {
+// ReloadPlugins clears the plugin cache and loads from the plugin path.
+// If a plugin cannot be loaded, an error is logged and the plugin is skipped.
+func (c *Cache) ReloadPlugins() {
+	path := c.config.GetPluginsPath()
 	plugins := make([]Config, 0)
 
 	logger.Debugf("Reading plugin configs from %s", path)
-	pluginFiles := []string{}
-	err := filepath.Walk(path, func(fp string, f os.FileInfo, err error) error {
+
+	err := fsutil.SymWalk(path, func(fp string, f os.FileInfo, err error) error {
 		if filepath.Ext(fp) == ".yml" {
-			pluginFiles = append(pluginFiles, fp)
+			plugin, err := loadPluginFromYAMLFile(fp)
+			if err != nil {
+				logger.Errorf("Error loading plugin %s: %v", fp, err)
+			} else {
+				plugins = append(plugins, *plugin)
+			}
 		}
 		return nil
 	})
 
 	if err != nil {
-
-		return nil, err
+		logger.Errorf("Error reading plugin configs: %v", err)
 	}
 
-	for _, file := range pluginFiles {
-		plugin, err := loadPluginFromYAMLFile(file)
-		if err != nil {
-			logger.Errorf("Error loading plugin %s: %s", file, err.Error())
-		} else {
-			plugins = append(plugins, *plugin)
-		}
-	}
-
-	return plugins, nil
+	c.plugins = plugins
 }
 
 func (c Cache) enabledPlugins() []Config {
@@ -130,7 +156,7 @@ func (c Cache) enabledPlugins() []Config {
 
 	var ret []Config
 	for _, p := range c.plugins {
-		disabled := stringslice.StrInclude(disabledPlugins, p.id)
+		disabled := sliceutil.Contains(disabledPlugins, p.id)
 
 		if !disabled {
 			ret = append(ret, p)
@@ -143,7 +169,7 @@ func (c Cache) enabledPlugins() []Config {
 func (c Cache) pluginDisabled(id string) bool {
 	disabledPlugins := c.config.GetDisabledPlugins()
 
-	return stringslice.StrInclude(disabledPlugins, id)
+	return sliceutil.Contains(disabledPlugins, id)
 }
 
 // ListPlugins returns plugin details for all of the loaded plugins.
@@ -154,13 +180,29 @@ func (c Cache) ListPlugins() []*Plugin {
 	for _, s := range c.plugins {
 		p := s.toPlugin()
 
-		disabled := stringslice.StrInclude(disabledPlugins, p.ID)
+		disabled := sliceutil.Contains(disabledPlugins, p.ID)
 		p.Enabled = !disabled
 
 		ret = append(ret, p)
 	}
 
 	return ret
+}
+
+// GetPlugin returns the plugin with the given ID.
+// Returns nil if the plugin is not found.
+func (c Cache) GetPlugin(id string) *Plugin {
+	disabledPlugins := c.config.GetDisabledPlugins()
+	plugin := c.getPlugin(id)
+	if plugin != nil {
+		p := plugin.toPlugin()
+
+		disabled := sliceutil.Contains(disabledPlugins, p.ID)
+		p.Enabled = !disabled
+		return p
+	}
+
+	return nil
 }
 
 // ListPluginTasks returns all runnable plugin tasks in all loaded plugins.
@@ -266,7 +308,7 @@ func (c Cache) executePostHooks(ctx context.Context, hookType HookTriggerEnum, h
 		hooks := p.getHooks(hookType)
 		// don't revisit a plugin we've already visited
 		// only log if there's hooks that we're skipping
-		if len(hooks) > 0 && stringslice.StrInclude(visitedPlugins, p.id) {
+		if len(hooks) > 0 && sliceutil.Contains(visitedPlugins, p.id) {
 			logger.Debugf("plugin ID '%s' already triggered, not re-triggering", p.id)
 			continue
 		}

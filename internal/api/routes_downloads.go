@@ -4,15 +4,12 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stashapp/stash/internal/manager"
 )
 
 type downloadsRoutes struct{}
-
-func getDownloadsRoutes() chi.Router {
-	return downloadsRoutes{}.Routes()
-}
 
 func (rs downloadsRoutes) Routes() chi.Router {
 	r := chi.NewRouter()

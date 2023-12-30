@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/logger"
@@ -23,13 +23,6 @@ type MovieFinder interface {
 type movieRoutes struct {
 	routes
 	movieFinder MovieFinder
-}
-
-func getMovieRoutes(repo models.Repository) chi.Router {
-	return movieRoutes{
-		routes:      routes{txnManager: repo.TxnManager},
-		movieFinder: repo.Movie,
-	}.Routes()
 }
 
 func (rs movieRoutes) Routes() chi.Router {

@@ -50,7 +50,7 @@ func getDir(path string) string {
 }
 
 func getParent(path string) *string {
-	isRoot := path[len(path)-1:] == "/"
+	isRoot := path == "/"
 	if isRoot {
 		return nil
 	} else {
@@ -79,9 +79,6 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 
 	customPerformerImageLocation := config.GetCustomPerformerImageLocation()
 
-	scraperUserAgent := config.GetScraperUserAgent()
-	scraperCDPPath := config.GetScraperCDPPath()
-
 	return &ConfigGeneralResult{
 		Stashes:                       config.GetStashPaths(),
 		DatabasePath:                  config.GetDatabasePath(),
@@ -90,6 +87,7 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 		MetadataPath:                  config.GetMetadataPath(),
 		ConfigFilePath:                config.GetConfigFile(),
 		ScrapersPath:                  config.GetScrapersPath(),
+		PluginsPath:                   config.GetPluginsPath(),
 		CachePath:                     config.GetCachePath(),
 		BlobsPath:                     config.GetBlobsPath(),
 		BlobsStorage:                  config.GetBlobsStorage(),
@@ -123,9 +121,6 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 		Excludes:                      config.GetExcludes(),
 		ImageExcludes:                 config.GetImageExcludes(),
 		CustomPerformerImageLocation:  &customPerformerImageLocation,
-		ScraperUserAgent:              &scraperUserAgent,
-		ScraperCertCheck:              config.GetScraperCertCheck(),
-		ScraperCDPPath:                &scraperCDPPath,
 		StashBoxes:                    config.GetStashBoxes(),
 		PythonPath:                    config.GetPythonPath(),
 		TranscodeInputArgs:            config.GetTranscodeInputArgs(),
@@ -133,6 +128,8 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 		LiveTranscodeInputArgs:        config.GetLiveTranscodeInputArgs(),
 		LiveTranscodeOutputArgs:       config.GetLiveTranscodeOutputArgs(),
 		DrawFunscriptHeatmapRange:     config.GetDrawFunscriptHeatmapRange(),
+		ScraperPackageSources:         config.GetScraperPackageSources(),
+		PluginPackageSources:          config.GetPluginPackageSources(),
 	}
 }
 
@@ -161,7 +158,6 @@ func makeConfigInterfaceResult() *ConfigInterfaceResult {
 	scriptOffset := config.GetFunscriptOffset()
 	useStashHostedFunscript := config.GetUseStashHostedFunscript()
 	imageLightboxOptions := config.GetImageLightboxOptions()
-	// FIXME - misnamed output field means we have redundant fields
 	disableDropdownCreate := config.GetDisableDropdownCreate()
 
 	return &ConfigInterfaceResult{
@@ -187,9 +183,7 @@ func makeConfigInterfaceResult() *ConfigInterfaceResult {
 
 		ImageLightbox: &imageLightboxOptions,
 
-		// FIXME - see above
-		DisabledDropdownCreate: disableDropdownCreate,
-		DisableDropdownCreate:  disableDropdownCreate,
+		DisableDropdownCreate: disableDropdownCreate,
 
 		HandyKey:                &handyKey,
 		FunscriptOffset:         &scriptOffset,

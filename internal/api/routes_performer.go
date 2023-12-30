@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/utils"
@@ -20,13 +21,6 @@ type PerformerFinder interface {
 type performerRoutes struct {
 	routes
 	performerFinder PerformerFinder
-}
-
-func getPerformerRoutes(repo models.Repository) chi.Router {
-	return performerRoutes{
-		routes:          routes{txnManager: repo.TxnManager},
-		performerFinder: repo.Performer,
-	}.Routes()
 }
 
 func (rs performerRoutes) Routes() chi.Router {

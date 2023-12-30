@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
+	"gopkg.in/yaml.v2"
+
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
-	"gopkg.in/yaml.v2"
+	"github.com/stashapp/stash/pkg/sliceutil"
 )
 
 type mappedQuery interface {
@@ -729,8 +730,8 @@ func (c mappedScraperAttrConfig) concatenateResults(nodes []string) string {
 }
 
 func (c mappedScraperAttrConfig) cleanResults(nodes []string) []string {
-	cleaned := stringslice.StrUnique(nodes)      // remove duplicate values
-	cleaned = stringslice.StrDelete(cleaned, "") // remove empty values
+	cleaned := sliceutil.Unique(nodes)      // remove duplicate values
+	cleaned = sliceutil.Delete(cleaned, "") // remove empty values
 	return cleaned
 }
 
@@ -971,10 +972,11 @@ func (s mappedScraper) scrapeScenes(ctx context.Context, q mappedQuery) ([]*Scra
 
 func (s mappedScraper) scrapeScene(ctx context.Context, q mappedQuery) (*ScrapedScene, error) {
 	sceneScraperConfig := s.Scene
-	sceneMap := sceneScraperConfig.mappedConfig
-	if sceneMap == nil {
+	if sceneScraperConfig == nil {
 		return nil, nil
 	}
+
+	sceneMap := sceneScraperConfig.mappedConfig
 
 	logger.Debug(`Processing scene:`)
 	results := sceneMap.process(ctx, q, s.Common)
@@ -999,10 +1001,11 @@ func (s mappedScraper) scrapeGallery(ctx context.Context, q mappedQuery) (*Scrap
 	var ret ScrapedGallery
 
 	galleryScraperConfig := s.Gallery
-	galleryMap := galleryScraperConfig.mappedConfig
-	if galleryMap == nil {
+	if galleryScraperConfig == nil {
 		return nil, nil
 	}
+
+	galleryMap := galleryScraperConfig.mappedConfig
 
 	galleryPerformersMap := galleryScraperConfig.Performers
 	galleryTagsMap := galleryScraperConfig.Tags
@@ -1061,10 +1064,11 @@ func (s mappedScraper) scrapeMovie(ctx context.Context, q mappedQuery) (*models.
 	var ret models.ScrapedMovie
 
 	movieScraperConfig := s.Movie
-	movieMap := movieScraperConfig.mappedConfig
-	if movieMap == nil {
+	if movieScraperConfig == nil {
 		return nil, nil
 	}
+
+	movieMap := movieScraperConfig.mappedConfig
 
 	movieStudioMap := movieScraperConfig.Studio
 
