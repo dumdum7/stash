@@ -74,7 +74,6 @@ export const LibraryTasks: React.FC = () => {
   const [configureDefaults] = useConfigureDefaults();
 
   const [dialogOpen, setDialogOpenState] = useState({
-    clean: false,
     scan: false,
     autoTag: false,
     identify: false,
@@ -327,7 +326,7 @@ export const LibraryTasks: React.FC = () => {
         </SettingGroup>
       </SettingSection>
 
-      <SettingSection>
+      <SettingSection advanced>
         <Setting
           heading={
             <>
@@ -349,7 +348,7 @@ export const LibraryTasks: React.FC = () => {
         </Setting>
       </SettingSection>
 
-      <SettingSection>
+      <SettingSection advanced>
         <SettingGroup
           settingProps={{
             heading: (

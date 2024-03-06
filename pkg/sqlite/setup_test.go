@@ -539,7 +539,6 @@ func TestMain(m *testing.M) {
 	// initialise empty config - needed by some migrations
 	_ = config.InitializeEmpty()
 
-
 	ret := runTests(m)
 	os.Exit(ret)
 }
@@ -1013,10 +1012,6 @@ func makeSceneFile(i int) *models.VideoFile {
 	}
 }
 
-func getScenePlayCount(index int) int {
-	return index % 5
-}
-
 func getScenePlayDuration(index int) float64 {
 	if index%5 == 0 {
 		return 0
@@ -1031,15 +1026,6 @@ func getSceneResumeTime(index int) float64 {
 	}
 
 	return float64(index%5) * 1.2
-}
-
-func getSceneLastPlayed(index int) *time.Time {
-	if index%5 == 0 {
-		return nil
-	}
-
-	t := time.Date(2020, 1, index%5, 1, 2, 3, 0, time.UTC)
-	return &t
 }
 
 func makeScene(i int) *models.Scene {
@@ -1074,7 +1060,6 @@ func makeScene(i int) *models.Scene {
 			getSceneEmptyString(i, urlField),
 		}),
 		Rating:       getIntPtr(rating),
-		OCounter:     getOCounter(i),
 		Date:         getObjectDate(i),
 		StudioID:     studioID,
 		GalleryIDs:   models.NewRelatedIDs(gids),
@@ -1084,9 +1069,7 @@ func makeScene(i int) *models.Scene {
 		StashIDs: models.NewRelatedStashIDs([]models.StashID{
 			sceneStashID(i),
 		}),
-		PlayCount:    getScenePlayCount(i),
 		PlayDuration: getScenePlayDuration(i),
-		LastPlayedAt: getSceneLastPlayed(i),
 		ResumeTime:   getSceneResumeTime(i),
 	}
 }

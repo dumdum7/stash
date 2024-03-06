@@ -29,6 +29,7 @@ import { CaptionsCriterionOption } from "./criteria/captions";
 import { StashIDCriterionOption } from "./criteria/stash-ids";
 import { RatingCriterionOption } from "./criteria/rating";
 import { PathCriterionOption } from "./criteria/path";
+import { OrientationCriterionOption } from "./criteria/orientation";
 
 const defaultSortBy = "random";
 const sortByOptions = [
@@ -41,6 +42,7 @@ const sortByOptions = [
   "framerate",
   "bitrate",
   "last_played_at",
+  "last_o_at",
   "resume_time",
   "play_duration",
   "play_count",
@@ -72,6 +74,7 @@ const criterionOptions = [
   RatingCriterionOption,
   createMandatoryNumberCriterionOption("o_counter"),
   ResolutionCriterionOption,
+  OrientationCriterionOption,
   createMandatoryNumberCriterionOption("framerate"),
   createStringCriterionOption("video_codec"),
   createStringCriterionOption("audio_codec"),

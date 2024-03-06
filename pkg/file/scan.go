@@ -653,6 +653,7 @@ func (s *scanJob) handleFile(ctx context.Context, f scanFile) error {
 		}
 
 		if ff == nil {
+			// returns a file only if it is actually new
 			ff, err = s.onNewFile(ctx, f)
 			return err
 		}
@@ -740,7 +741,10 @@ func (s *scanJob) onNewFile(ctx context.Context, f scanFile) (models.File, error
 	}
 
 	if renamed != nil {
-		return renamed, nil
+		// handle rename should have already handled the contents of the zip file
+		// so shouldn't need to scan it again
+		// return nil so it doesn't
+		return nil, nil
 	}
 
 	// if not renamed, queue file for creation
@@ -863,9 +867,11 @@ func (s *scanJob) handleRename(ctx context.Context, f models.File, fp []models.F
 			continue
 		}
 
-		if _, err := fs.Lstat(other.Base().Path); err != nil {
+		info, err := fs.Lstat(other.Base().Path)
+		switch {
+		case err != nil:
 			missing = append(missing, other)
-		} else if strings.EqualFold(f.Base().Path, other.Base().Path) {
+		case strings.EqualFold(f.Base().Path, other.Base().Path):
 			// #1426 - if file exists but is a case-insensitive match for the
 			// original filename, and the filesystem is case-insensitive
 			// then treat it as a move
@@ -873,6 +879,10 @@ func (s *scanJob) handleRename(ctx context.Context, f models.File, fp []models.F
 				// treat as a move
 				missing = append(missing, other)
 			}
+		case !s.acceptEntry(ctx, other.Base().Path, info):
+			// #4393 - if the file is no longer in the configured library paths, treat it as a move
+			logger.Debugf("File %q no longer in library paths. Treating as a move.", other.Base().Path)
+			missing = append(missing, other)
 		}
 	}
 
@@ -901,8 +911,8 @@ func (s *scanJob) handleRename(ctx context.Context, f models.File, fp []models.F
 		}
 
 		if s.isZipFile(fBase.Basename) {
-			if err := TransferZipFolderHierarchy(ctx, s.Repository.Folder, fBase.ID, otherBase.Path, fBase.Path); err != nil {
-				return fmt.Errorf("moving folder hierarchy for renamed zip file %q: %w", fBase.Path, err)
+			if err := transferZipHierarchy(ctx, s.Repository.Folder, s.Repository.File, fBase.ID, otherBase.Path, fBase.Path); err != nil {
+				return fmt.Errorf("moving zip hierarchy for renamed zip file %q: %w", fBase.Path, err)
 			}
 		}
 

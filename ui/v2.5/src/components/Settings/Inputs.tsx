@@ -4,10 +4,12 @@ import { Button, Collapse, Form, Modal, ModalProps } from "react-bootstrap";
 import { FormattedMessage, useIntl } from "react-intl";
 import { Icon } from "../Shared/Icon";
 import { StringListInput } from "../Shared/StringListInput";
-import { PatchComponent } from "src/pluginApi";
+import { PatchComponent } from "src/patch";
+import { useSettings, useSettingsOptional } from "./context";
 
 interface ISetting {
   id?: string;
+  advanced?: boolean;
   className?: string;
   heading?: React.ReactNode;
   headingID?: string;
@@ -32,7 +34,11 @@ export const Setting: React.FC<PropsWithChildren<ISetting>> = PatchComponent(
       tooltipID,
       onClick,
       disabled,
+      advanced,
     } = props;
+
+    // these components can be used in the setup wizard, where advanced mode is not available
+    const { advancedMode } = useSettingsOptional();
 
     const intl = useIntl();
 
@@ -60,6 +66,8 @@ export const Setting: React.FC<PropsWithChildren<ISetting>> = PatchComponent(
       ? intl.formatMessage({ id: tooltipID })
       : undefined;
     const disabledClassName = disabled ? "disabled" : "";
+
+    if (advanced && !advancedMode) return null;
 
     return (
       <div
@@ -172,9 +180,15 @@ export const SelectSetting: React.FC<PropsWithChildren<ISelectSetting>> = ({
   value,
   children,
   onChange,
+  advanced,
 }) => {
   return (
-    <Setting headingID={headingID} subHeadingID={subHeadingID} id={id}>
+    <Setting
+      advanced={advanced}
+      headingID={headingID}
+      subHeadingID={subHeadingID}
+      id={id}
+    >
       <Form.Control
         className="input-control"
         as="select"
@@ -309,7 +323,10 @@ export const SettingModal = <T extends {}>(props: ISettingModal<T>) => {
             type="submit"
             variant="primary"
             onClick={() => close(currentValue)}
-            disabled={!currentValue || (validate && !validate(currentValue))}
+            disabled={
+              currentValue === undefined ||
+              (validate && !validate(currentValue))
+            }
           >
             <FormattedMessage id="actions.confirm" />
           </Button>
@@ -346,8 +363,12 @@ export const ModalSetting = <T extends {}>(props: IModalSetting<T>) => {
     buttonTextID,
     modalProps,
     disabled,
+    advanced,
   } = props;
   const [showModal, setShowModal] = useState(false);
+  const { advancedMode } = useSettings();
+
+  if (advanced && !advancedMode) return null;
 
   return (
     <>
