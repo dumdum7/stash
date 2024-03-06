@@ -31,7 +31,7 @@ import { RatingCriterionOption } from "./criteria/rating";
 import { PathCriterionOption } from "./criteria/path";
 import { OrientationCriterionOption } from "./criteria/orientation";
 
-const defaultSortBy = "date";
+const defaultSortBy = "random";
 const sortByOptions = [
   "organized",
   "o_counter",
