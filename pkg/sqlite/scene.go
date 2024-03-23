@@ -957,6 +957,7 @@ func (qb *SceneStore) makeFilter(ctx context.Context, sceneFilter *models.SceneF
 	query.handleCriterion(ctx, resolutionCriterionHandler(sceneFilter.Resolution, "video_files.height", "video_files.width", qb.addVideoFilesTable))
 	query.handleCriterion(ctx, orientationCriterionHandler(sceneFilter.Orientation, "video_files.height", "video_files.width", qb.addVideoFilesTable))
 	query.handleCriterion(ctx, floatIntCriterionHandler(sceneFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable))
+	query.handleCriterion(ctx, intCriterionHandler(sceneFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable))
 	query.handleCriterion(ctx, codecCriterionHandler(sceneFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable))
 	query.handleCriterion(ctx, codecCriterionHandler(sceneFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable))
 
@@ -992,6 +993,7 @@ func (qb *SceneStore) makeFilter(ctx context.Context, sceneFilter *models.SceneF
 	query.handleCriterion(ctx, scenePerformerCountCriterionHandler(qb, sceneFilter.PerformerCount))
 	query.handleCriterion(ctx, studioCriterionHandler(sceneTable, sceneFilter.Studios))
 	query.handleCriterion(ctx, sceneMoviesCriterionHandler(qb, sceneFilter.Movies))
+	query.handleCriterion(ctx, sceneGalleriesCriterionHandler(qb, sceneFilter.Galleries))
 	query.handleCriterion(ctx, scenePerformerTagsCriterionHandler(qb, sceneFilter.PerformerTags))
 	query.handleCriterion(ctx, scenePerformerFavoriteCriterionHandler(sceneFilter.PerformerFavorite))
 	query.handleCriterion(ctx, scenePerformerAgeCriterionHandler(sceneFilter.PerformerAge))
@@ -1451,6 +1453,15 @@ func sceneMoviesCriterionHandler(qb *SceneStore, movies *models.MultiCriterionIn
 	}
 	h := qb.getMultiCriterionHandlerBuilder(movieTable, moviesScenesTable, "movie_id", addJoinsFunc)
 	return h.handler(movies)
+}
+
+func sceneGalleriesCriterionHandler(qb *SceneStore, galleries *models.MultiCriterionInput) criterionHandlerFunc {
+	addJoinsFunc := func(f *filterBuilder) {
+		qb.galleriesRepository().join(f, "", "scenes.id")
+		f.addLeftJoin("galleries", "", "scenes_galleries.gallery_id = galleries.id")
+	}
+	h := qb.getMultiCriterionHandlerBuilder(galleryTable, scenesGalleriesTable, "gallery_id", addJoinsFunc)
+	return h.handler(galleries)
 }
 
 func scenePerformerTagsCriterionHandler(qb *SceneStore, tags *models.HierarchicalMultiCriterionInput) criterionHandler {
