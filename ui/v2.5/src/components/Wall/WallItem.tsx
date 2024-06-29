@@ -64,6 +64,25 @@ const Preview: React.FC<{
     }
   }, [previewType, soundOnPreview, active]);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.intersectionRatio > 0)
+            // Catch is necessary due to DOMException if user hovers before clicking on page
+            videoEl.current?.play()?.catch(() => {});
+          else videoEl.current?.pause();
+        });
+      },
+      {
+        // @ts-ignore
+        delay: 100,
+      }
+    );
+
+    if (videoEl.current) observer.observe(videoEl.current);
+  });
+
   const image = (
     <img
       loading="lazy"
@@ -80,7 +99,6 @@ const Preview: React.FC<{
       playsInline
       src={previews.video}
       poster={previews.image}
-      autoPlay={previewType === "video"}
       loop
       muted
       className={cx("wall-item-media", {
