@@ -248,7 +248,18 @@ export const LightboxImage: React.FC<IProps> = ({
       setPositionX(newPositionX);
       setPositionY(newPositionY);
     }
-  }, [src, width, height, boxWidth, boxHeight, displayMode, scaleUp, dimensionsProvided, calculateInitialPosition, container]);
+  }, [
+    src,
+    width,
+    height,
+    boxWidth,
+    boxHeight,
+    displayMode,
+    scaleUp,
+    dimensionsProvided,
+    calculateInitialPosition,
+    container,
+  ]);
 
   useEffect(() => {
     // don't set anything until we have the dimensions
