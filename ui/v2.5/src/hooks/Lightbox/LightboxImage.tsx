@@ -220,6 +220,37 @@ export const LightboxImage: React.FC<IProps> = ({
   );
 
   useEffect(() => {
+    // Reset state when the src prop changes
+    setPositionX(0);
+    setPositionY(0);
+    setDefaultZoom(1);
+    setImageWidth(width);
+    setImageHeight(height);
+
+    if (container.current) {
+      setBoxWidth(container.current.offsetWidth);
+      setBoxHeight(container.current.offsetHeight);
+    }
+
+    if (dimensionsProvided) {
+      const newZoom = calculateDefaultZoom(
+        width,
+        height,
+        boxWidth,
+        boxHeight,
+        displayMode,
+        scaleUp
+      );
+
+      setDefaultZoom(newZoom);
+
+      const [newPositionX, newPositionY] = calculateInitialPosition(newZoom);
+      setPositionX(newPositionX);
+      setPositionY(newPositionY);
+    }
+  }, [src, width, height, boxWidth, boxHeight, displayMode, scaleUp, dimensionsProvided, calculateInitialPosition]);
+
+  useEffect(() => {
     // don't set anything until we have the dimensions
     if (!imageWidth || !imageHeight || !boxWidth || !boxHeight) {
       return;
@@ -552,13 +583,7 @@ export const LightboxImage: React.FC<IProps> = ({
       onWheel={(e) => onContainerScroll(e)}
     >
       {defaultZoom ? (
-        <picture
-          style={{
-            transform: `translate(${positionX}px, ${positionY}px) scale(${
-              defaultZoom * zoom
-            })`,
-          }}
-        >
+        <picture>
           <source srcSet={src} media="(min-width: 800px)" />
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
           <ImageView

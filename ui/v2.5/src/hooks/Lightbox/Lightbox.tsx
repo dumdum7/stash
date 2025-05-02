@@ -72,7 +72,7 @@ const CLASSNAME_NAVIMAGE = `${CLASSNAME_NAV}-image`;
 const CLASSNAME_NAVSELECTED = `${CLASSNAME_NAV}-selected`;
 
 const DEFAULT_SLIDESHOW_DELAY = 5000;
-const SECONDS_TO_MS = 1000;
+const SECONDS_TO_MS = 1;
 const MIN_VALID_INTERVAL_SECONDS = 1;
 const MIN_ZOOM = 0.1;
 const SCROLL_ZOOM_TIMEOUT = 250;
@@ -113,7 +113,7 @@ export const LightboxComponent: React.FC<IProps> = ({
   const [index, setIndex] = useState<number | null>(null);
   const [movingLeft, setMovingLeft] = useState(false);
   const oldIndex = useRef<number | null>(null);
-  const [instantTransition, setInstantTransition] = useState(false);
+  const [instantTransition, setInstantTransition] = useState(true);
   const [isSwitchingPage, setIsSwitchingPage] = useState(true);
   const [isFullscreen, setFullscreen] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
@@ -849,38 +849,33 @@ export const LightboxComponent: React.FC<IProps> = ({
             className={cx(CLASSNAME_CAROUSEL, {
               [CLASSNAME_INSTANT]: instantTransition,
             })}
-            style={{ left: `${currentIndex * -100}vw` }}
             ref={carouselRef}
           >
-            {images.map((image, i) => (
-              <div className={`${CLASSNAME_IMAGE}`} key={image.paths.image}>
-                {i >= currentIndex - 1 && i <= currentIndex + 1 ? (
-                  <LightboxImage
-                    src={image.paths.image ?? ""}
-                    width={image.visual_files?.[0]?.width ?? 0}
-                    height={image.visual_files?.[0]?.height ?? 0}
-                    displayMode={displayMode}
-                    scaleUp={lightboxSettings?.scaleUp ?? false}
-                    scrollMode={
-                      lightboxSettings?.scrollMode ??
-                      GQL.ImageLightboxScrollMode.Zoom
-                    }
-                    resetPosition={resetPosition}
-                    zoom={i === currentIndex ? zoom : 1}
-                    scrollAttemptsBeforeChange={scrollAttemptsBeforeChange}
-                    firstScroll={firstScroll}
-                    inScrollGroup={inScrollGroup}
-                    current={i === currentIndex}
-                    alignBottom={movingLeft}
-                    setZoom={updateZoom}
-                    debouncedScrollReset={debouncedScrollReset}
-                    onLeft={handleLeft}
-                    onRight={handleRight}
-                    isVideo={isVideo(image.visual_files?.[0] ?? {})}
-                  />
-                ) : undefined}
-              </div>
-            ))}
+            <div className={`${CLASSNAME_IMAGE}`}>
+              <LightboxImage
+                src={images[currentIndex].paths.image ?? ""}
+                width={images[currentIndex].visual_files?.[0]?.width ?? 0}
+                height={images[currentIndex].visual_files?.[0]?.height ?? 0}
+                displayMode={displayMode}
+                scaleUp={lightboxSettings?.scaleUp ?? false}
+                scrollMode={
+                  lightboxSettings?.scrollMode ??
+                  GQL.ImageLightboxScrollMode.Zoom
+                }
+                resetPosition={resetPosition}
+                zoom={zoom}
+                scrollAttemptsBeforeChange={scrollAttemptsBeforeChange}
+                firstScroll={firstScroll}
+                inScrollGroup={inScrollGroup}
+                current={true}
+                alignBottom={movingLeft}
+                setZoom={updateZoom}
+                debouncedScrollReset={debouncedScrollReset}
+                onLeft={handleLeft}
+                onRight={handleRight}
+                isVideo={isVideo(images[currentIndex].visual_files?.[0] ?? {})}
+              />
+            </div>
           </div>
 
           {allowNavigation && (

@@ -136,8 +136,10 @@
 
       picture {
         display: flex;
-        margin: auto;
         position: relative;
+        justify-content: center;
+        width: 100vw;
+        max-width: 100vw;
 
         > div {
           display: flex;
@@ -150,6 +152,7 @@
       img {
         cursor: pointer;
         object-fit: contain;
+        max-width: 100vw;
       }
     }
   }
