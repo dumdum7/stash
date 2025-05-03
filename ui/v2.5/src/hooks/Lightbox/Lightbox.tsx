@@ -852,29 +852,30 @@ export const LightboxComponent: React.FC<IProps> = ({
             ref={carouselRef}
           >
             <div className={`${CLASSNAME_IMAGE}`}>
-              <LightboxImage
-                src={images[currentIndex].paths.image ?? ""}
-                width={images[currentIndex].visual_files?.[0]?.width ?? 0}
-                height={images[currentIndex].visual_files?.[0]?.height ?? 0}
-                displayMode={displayMode}
-                scaleUp={lightboxSettings?.scaleUp ?? false}
-                scrollMode={
-                  lightboxSettings?.scrollMode ??
-                  GQL.ImageLightboxScrollMode.Zoom
-                }
-                resetPosition={resetPosition}
-                zoom={zoom}
-                scrollAttemptsBeforeChange={scrollAttemptsBeforeChange}
-                firstScroll={firstScroll}
-                inScrollGroup={inScrollGroup}
-                current={true}
-                alignBottom={movingLeft}
-                setZoom={updateZoom}
-                debouncedScrollReset={debouncedScrollReset}
-                onLeft={handleLeft}
-                onRight={handleRight}
-                isVideo={isVideo(images[currentIndex].visual_files?.[0] ?? {})}
-              />
+              {images[currentIndex] ?
+                <LightboxImage
+                  src={images[currentIndex].paths.image ?? ""}
+                  width={images[currentIndex].visual_files?.[0]?.width ?? 0}
+                  height={images[currentIndex].visual_files?.[0]?.height ?? 0}
+                  displayMode={displayMode}
+                  scaleUp={lightboxSettings?.scaleUp ?? false}
+                  scrollMode={
+                    lightboxSettings?.scrollMode ??
+                    GQL.ImageLightboxScrollMode.Zoom
+                  }
+                  resetPosition={resetPosition}
+                  zoom={zoom}
+                  scrollAttemptsBeforeChange={scrollAttemptsBeforeChange}
+                  firstScroll={firstScroll}
+                  inScrollGroup={inScrollGroup}
+                  current={true}
+                  alignBottom={movingLeft}
+                  setZoom={updateZoom}
+                  debouncedScrollReset={debouncedScrollReset}
+                  onLeft={handleLeft}
+                  onRight={handleRight}
+                  isVideo={isVideo(images[currentIndex].visual_files?.[0] ?? {})}
+                /> : undefined }
             </div>
           </div>
 
