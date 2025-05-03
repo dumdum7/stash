@@ -852,7 +852,7 @@ export const LightboxComponent: React.FC<IProps> = ({
             ref={carouselRef}
           >
             <div className={`${CLASSNAME_IMAGE}`}>
-              {images[currentIndex] ?
+              {images[currentIndex] ? (
                 <LightboxImage
                   src={images[currentIndex].paths.image ?? ""}
                   width={images[currentIndex].visual_files?.[0]?.width ?? 0}
@@ -874,8 +874,11 @@ export const LightboxComponent: React.FC<IProps> = ({
                   debouncedScrollReset={debouncedScrollReset}
                   onLeft={handleLeft}
                   onRight={handleRight}
-                  isVideo={isVideo(images[currentIndex].visual_files?.[0] ?? {})}
-                /> : undefined }
+                  isVideo={isVideo(
+                    images[currentIndex].visual_files?.[0] ?? {}
+                  )}
+                />
+              ) : undefined}
             </div>
           </div>
 
