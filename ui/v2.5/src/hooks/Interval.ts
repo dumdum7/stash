@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const MIN_VALID_INTERVAL = 1000;
+const MIN_VALID_INTERVAL = 1;
 
 function noop() {}
 
