@@ -8,7 +8,7 @@ import {
   IListFilterOperation,
   ListOperationButtons,
 } from "./ListOperationButtons";
-import { ButtonToolbar } from "react-bootstrap";
+import { ButtonGroup, ButtonToolbar } from "react-bootstrap";
 import { View } from "./views";
 import { IListSelect, useFilterOperations } from "./util";
 
@@ -63,29 +63,34 @@ export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
 
   return (
     <ButtonToolbar className="filtered-list-toolbar">
-      {showEditFilter && (
-        <ListFilter
-          onFilterUpdate={setFilter}
-          filter={filter}
-          openFilterDialog={() => showEditFilter()}
-          view={view}
+      <ButtonGroup>
+        {showEditFilter && (
+          <ListFilter
+            onFilterUpdate={setFilter}
+            filter={filter}
+            openFilterDialog={() => showEditFilter()}
+            view={view}
+          />
+        )}
+        <ListOperationButtons
+          onSelectAll={onSelectAll}
+          onSelectNone={onSelectNone}
+          otherOperations={operations}
+          itemsSelected={selectedIds.size > 0}
+          onEdit={onEdit}
+          onDelete={onDelete}
         />
-      )}
-      <ListOperationButtons
-        onSelectAll={onSelectAll}
-        onSelectNone={onSelectNone}
-        otherOperations={operations}
-        itemsSelected={selectedIds.size > 0}
-        onEdit={onEdit}
-        onDelete={onDelete}
-      />
-      <ListViewOptions
-        displayMode={filter.displayMode}
-        displayModeOptions={filterOptions.displayModeOptions}
-        onSetDisplayMode={setDisplayMode}
-        zoomIndex={zoomable ? filter.zoomIndex : undefined}
-        onSetZoom={zoomable ? setZoom : undefined}
-      />
+        <ButtonGroup>
+          <ListViewOptions
+            displayMode={filter.displayMode}
+            displayModeOptions={filterOptions.displayModeOptions}
+            onSetDisplayMode={setDisplayMode}
+            zoomIndex={zoomable ? filter.zoomIndex : undefined}
+            onSetZoom={zoomable ? setZoom : undefined}
+          />
+        </ButtonGroup>
+      </ButtonGroup>
+      <ButtonGroup></ButtonGroup>
     </ButtonToolbar>
   );
 };
