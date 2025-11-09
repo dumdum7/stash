@@ -50,6 +50,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
     holdDelay: number;
     minScale: number;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly videoEl: any;
 
   constructor(player: VideoJsPlayer, options = {}) {
