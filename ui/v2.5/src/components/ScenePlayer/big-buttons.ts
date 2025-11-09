@@ -23,14 +23,14 @@ class BigButtonGroup extends videojs.getComponent("Component") {
 
     this.addChild("seekButton", {
       direction: "back",
-      seconds: 10,
+      seconds: 5,
     });
 
     this.addChild("BigPlayPauseButton");
 
     this.addChild("seekButton", {
       direction: "forward",
-      seconds: 10,
+      seconds: 5,
     });
   }
 
