@@ -53,19 +53,18 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly videoEl: any;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private bigButtonGroupEl: any;
+
   constructor(player: VideoJsPlayer, options = {}) {
     super(player);
-
-    player.ready(() => {
-      player.addChild("BigButtonGroup");
-    });
 
     this.player = player;
     this.options = Object.assign(
       {
         maxScale: 1.25, // Scale when pulling up (enter fullscreen)
         minScale: 0.95, // Scale when pulling down (exit fullscreen)
-        pullDistance: 100, // Distance threshold to trigger fullscreen toggle
+        pullDistance: 150, // Distance threshold to trigger fullscreen toggle
         scaleSensitivity: 300,
         holdDelay: 500,
       },
@@ -108,95 +107,112 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
     const { maxScale, minScale, pullDistance, scaleSensitivity, holdDelay } =
       this.options;
 
-    // Prevent long-press context menu (Android/Chrome)
-    this.videoEl.addEventListener("contextmenu", (e: PointerEvent) =>
-      e.preventDefault()
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addTouchEventListeners = (element: any, videoEl: any) => {
+      // Prevent long-press context menu (Android/Chrome)
+      element.addEventListener("contextmenu", (e: PointerEvent) =>
+        e.preventDefault()
+      );
 
-    // === TOUCH START ===
-    this.videoEl.addEventListener(
-      "touchstart",
-      (e: TouchEvent) => {
-        if (e.touches.length !== 1) return;
-        e.preventDefault();
+      // === TOUCH START ===
+      element.addEventListener(
+        "touchstart",
+        (e: TouchEvent) => {
+          if (e.touches.length !== 1) return;
+          e.preventDefault();
 
-        startY = e.touches[0].clientY;
-        currentY = startY;
-        isDragging = true;
-        isHolding = false;
+          startY = e.touches[0].clientY;
+          currentY = startY;
+          // todo: find a way to get accurate status bar height, if there is one
+          const STATUS_BAR_HEIGHT = 40;
+          // ignores touches that started at top of screen - user likely pulled down to show status bar
+          if (startY < STATUS_BAR_HEIGHT) return;
+          isDragging = true;
+          isHolding = false;
 
-        holdTimeout = setTimeout(() => {
-          if (distanceMoved > TOUCH_MOVE_2X_THRESHOLD) return;
-          isHolding = true;
-          this.player.playbackRate(2);
-        }, holdDelay);
-      },
-      { passive: false }
-    );
+          holdTimeout = setTimeout(() => {
+            if (distanceMoved > TOUCH_MOVE_2X_THRESHOLD) return;
+            isHolding = true;
+            this.player.playbackRate(2);
+          }, holdDelay);
+        },
+        { passive: false }
+      );
 
-    // === TOUCH MOVE ===
-    this.videoEl.addEventListener(
-      "touchmove",
-      (e: TouchEvent) => {
-        if (!isDragging || e.touches.length !== 1) return;
-        e.preventDefault();
+      // === TOUCH MOVE ===
+      element.addEventListener(
+        "touchmove",
+        (e: TouchEvent) => {
+          if (!isDragging || e.touches.length !== 1) return;
+          e.preventDefault();
 
-        distanceMoved = Math.abs(currentY - startY);
+          distanceMoved = Math.abs(currentY - startY);
 
-        if (isHolding) return;
+          if (isHolding) return;
 
-        currentY = e.touches[0].clientY;
+          currentY = e.touches[0].clientY;
+          const deltaY = startY - currentY;
+          const isFullscreen = this.player.isFullscreen();
+
+          if (!isFullscreen) {
+            // Pull-up to enter fullscreen
+            const scale = Math.min(
+              Math.max(1 + deltaY / scaleSensitivity, 1),
+              maxScale
+            );
+            videoEl.style.transform = `scale(${scale})`;
+          } else {
+            // Pull-down to exit fullscreen
+            const scale = Math.max(
+              Math.min(1 + deltaY / scaleSensitivity, 1),
+              minScale
+            );
+            const translateY = Math.min(Math.max(-deltaY / 2, 0), 100);
+            videoEl.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+          }
+        },
+        { passive: false }
+      );
+
+      // === TOUCH END ===
+      element.addEventListener("touchend", () => {
+        if (holdTimeout != null) clearTimeout(holdTimeout);
+
+        if (isHolding) {
+          this.player.playbackRate(1);
+        }
+
         const deltaY = startY - currentY;
         const isFullscreen = this.player.isFullscreen();
 
-        if (!isFullscreen) {
-          // Pull-up to enter fullscreen
-          const scale = Math.min(
-            Math.max(1 + deltaY / scaleSensitivity, 1),
-            maxScale
-          );
-          this.videoEl.style.transform = `scale(${scale})`;
-        } else {
-          // Pull-down to exit fullscreen
-          const scale = Math.max(
-            Math.min(1 + deltaY / scaleSensitivity, 1),
-            minScale
-          );
-          const translateY = Math.min(Math.max(-deltaY / 2, 0), 100);
-          this.videoEl.style.transform = `scale(${scale}) translateY(${translateY}px)`;
+        if (!isFullscreen && deltaY > pullDistance) {
+          this.player.requestFullscreen();
+        } else if (isFullscreen && deltaY < -pullDistance) {
+          this.player.exitFullscreen();
         }
-      },
-      { passive: false }
-    );
 
-    // === TOUCH END ===
-    this.videoEl.addEventListener("touchend", () => {
-      if (holdTimeout != null) clearTimeout(holdTimeout);
+        // Reset transform smoothly
+        videoEl.style.transform = "scale(1) translateY(0)";
+        isDragging = false;
+      });
 
-      if (isHolding) {
-        this.player.playbackRate(1);
-      }
+      // === TOUCH CANCEL ===
+      element.addEventListener("touchcancel", () => {
+        if (holdTimeout != null) clearTimeout(holdTimeout);
+        if (isHolding) this.player.playbackRate(1);
+        videoEl.style.transform = "scale(1) translateY(0)";
+        isDragging = false;
+      });
+    };
 
-      const deltaY = startY - currentY;
-      const isFullscreen = this.player.isFullscreen();
+    addTouchEventListeners(this.videoEl, this.videoEl);
 
-      if (!isFullscreen && deltaY > pullDistance) {
-        this.player.requestFullscreen();
-      } else if (isFullscreen && deltaY < -pullDistance) {
-        this.player.exitFullscreen();
-      }
-
-      // Reset transform smoothly
-      this.videoEl.style.transform = "scale(1) translateY(0)";
-      isDragging = false;
-    });
-
-    // === TOUCH CANCEL ===
-    this.videoEl.addEventListener("touchcancel", () => {
-      if (holdTimeout != null) clearTimeout(holdTimeout);
-      if (isHolding) this.player.playbackRate(1);
-      this.videoEl.style.transform = "scale(1) translateY(0)";
-      isDragging = false;
+    this.player.ready(() => {
+      this.player.addChild("BigButtonGroup");
+      this.bigButtonGroupEl = this.player
+        .el()
+        .querySelector(".vjs-big-button-group");
+      addTouchEventListeners(this.bigButtonGroupEl, this.videoEl);
     });
   }
 }
