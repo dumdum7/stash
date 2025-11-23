@@ -22,17 +22,7 @@ class BigButtonGroup extends videojs.getComponent("Component") {
   constructor(player: VideoJsPlayer) {
     super(player);
 
-    this.addChild("seekButton", {
-      direction: "back",
-      seconds: 5,
-    });
-
     this.addChild("BigPlayPauseButton");
-
-    this.addChild("seekButton", {
-      direction: "forward",
-      seconds: 5,
-    });
   }
 
   createEl() {
@@ -45,16 +35,20 @@ class BigButtonGroup extends videojs.getComponent("Component") {
 class BigButtonsPlugin extends videojs.getPlugin("plugin") {
   private readonly options: {
     maxScale: number;
+    minScale: number;
     pullDistance: number;
     scaleSensitivity: number;
     holdDelay: number;
-    minScale: number;
+    seekAmount: number;
+    tapTimeout: number;
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly videoEl: any;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private bigButtonGroupEl: any;
+  private topOverlay: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private topIndicator: any;
 
   constructor(player: VideoJsPlayer, options = {}) {
     super(player);
@@ -67,17 +61,247 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
         pullDistance: 150, // Distance threshold to trigger fullscreen toggle
         scaleSensitivity: 300,
         holdDelay: 500,
+        seekAmount: 5, // seconds to seek
+        tapTimeout: 300, // milliseconds between taps
       },
       options
     );
+
+    // only use gestures on mobile
+    if (!videojs.browser.IS_ANDROID && !videojs.browser.IS_IOS) {
+      player.ready(() => {
+        player.addChild("BigButtonGroup");
+      });
+      return;
+    }
 
     this.videoEl = this.player.el().querySelector("video");
     if (!this.videoEl) return;
 
     this.videoEl.classList.add("vjs-touch-gestures");
     this.addStyles();
-
+    this.initTopOverlay();
+    this.initDoubleTap();
     this.initEvents();
+  }
+
+  // Top overlay is used for showing speed indicator (2x)
+  initTopOverlay() {
+    this.topOverlay = videojs.dom.createEl("div", {
+      className: "vjs-top-overlay",
+    });
+    // Create speed indicator for top
+    this.topIndicator = videojs.dom.createEl("div", {
+      className: "vjs-speed-indicator",
+      innerHTML: `
+          <span class="vjs-seek-amount">2x</span>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF">
+            <path d="M100-240v-480l360 240-360 240Zm400 0v-480l360 240-360 240ZM180-480Zm400 0Zm-400 90 136-90-136-90v180Zm400 0 136-90-136-90v180Z"/>
+          </svg>
+        `,
+    });
+    this.topOverlay.appendChild(this.topIndicator);
+    this.player.el().appendChild(this.topOverlay);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private leftOverlay: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private rightOverlay: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private leftIndicator: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private rightIndicator: any;
+
+  initDoubleTap() {
+    this.leftOverlay = videojs.dom.createEl("div", {
+      className: "vjs-doubletap-overlay vjs-doubletap-left",
+    });
+
+    // Create right overlay
+    this.rightOverlay = videojs.dom.createEl("div", {
+      className: "vjs-doubletap-overlay vjs-doubletap-right",
+    });
+
+    // Create seek indicator for left
+    this.leftIndicator = videojs.dom.createEl("div", {
+      className: "vjs-seek-indicator",
+      innerHTML: `
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF">
+            <path d="M440-240 200-480l240-240 56 56-183 184 183 184-56 56Zm264 0L464-480l240-240 56 56-183 184 183 184-56 56Z"/>
+          </svg>
+          <span class="vjs-seek-amount">-${this.options.seekAmount}s</span>
+        `,
+    });
+
+    // Create seek indicator for right
+    this.rightIndicator = videojs.dom.createEl("div", {
+      className: "vjs-seek-indicator",
+      innerHTML: `
+          <span class="vjs-seek-amount">+${this.options.seekAmount}s</span>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF">
+            <path d="M383-480 200-664l56-56 240 240-240 240-56-56 183-184Zm264 0L464-664l56-56 240 240-240 240-56-56 183-184Z"/>
+          </svg>
+        `,
+    });
+
+    this.leftOverlay.appendChild(this.leftIndicator);
+    this.rightOverlay.appendChild(this.rightIndicator);
+
+    this.player.el().appendChild(this.leftOverlay);
+    this.player.el().appendChild(this.rightOverlay);
+
+    // Touch events for mobile
+    this.leftOverlay.addEventListener("touchend", (e: Event) =>
+      this.handleTap(e, "left")
+    );
+    this.rightOverlay.addEventListener("touchend", (e: Event) =>
+      this.handleTap(e, "right")
+    );
+
+    // Click events for desktop testing
+    this.leftOverlay.addEventListener("click", (e: Event) =>
+      this.handleTap(e, "left")
+    );
+    this.rightOverlay.addEventListener("click", (e: Event) =>
+      this.handleTap(e, "right")
+    );
+  }
+
+  private lastTapTime: number = 0;
+  private lastTapSide: "left" | "right" | null = null;
+
+  private seekCount: number = 0;
+  private leftSeekAnimationTimeout: number | undefined = undefined;
+  private rightSeekAnimationTimeout: number | undefined = undefined;
+  private isSeekActive: boolean = false;
+
+  handleTap(event: Event, side: "left" | "right") {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - this.lastTapTime;
+
+    // If seek is already active on this side, increment the count
+    if (this.isSeekActive && this.lastTapSide === side) {
+      this.seekCount++;
+      this.performSeek(side, event);
+      this.player.userActive(false);
+      return;
+    }
+
+    // Check if this is a double tap on the same side
+    if (
+      timeSinceLastTap < this.options.tapTimeout &&
+      this.lastTapSide === side
+    ) {
+      // Double tap detected - start seek sequence
+      this.seekCount = 1;
+      this.isSeekActive = true;
+      this.performSeek(side, event);
+      this.player.userActive(false);
+    } else {
+      this.player.userActive(!this.player.userActive());
+      // First tap
+      this.seekCount = 0;
+      this.lastTapTime = currentTime;
+      this.lastTapSide = side;
+    }
+  }
+
+  performSeek(side: "left" | "right", event: Event) {
+    const currentTime = this.player.currentTime();
+    const totalSeekAmount = this.seekCount * this.options.seekAmount;
+    const seekDirection = side === "left" ? -1 : 1;
+    const seekAmount = seekDirection * this.options.seekAmount;
+    const newTime = Math.max(
+      0,
+      Math.min(this.player.duration(), currentTime + seekAmount)
+    );
+
+    this.player.currentTime(newTime);
+
+    // Update the indicator to show cumulative seek amount
+    this.updateSeekIndicator(side, totalSeekAmount);
+
+    // Show visual feedback
+    this.showSeekFeedback(side);
+    this.createRipple(side, event);
+
+    // Reset the seek sequence after a delay
+    if (side == "left") {
+      clearTimeout(this.leftSeekAnimationTimeout);
+      this.leftSeekAnimationTimeout = setTimeout(() => {
+        this.resetSeekSequence(side);
+      }, 800);
+    } else {
+      clearTimeout(this.rightSeekAnimationTimeout);
+      this.rightSeekAnimationTimeout = setTimeout(() => {
+        this.resetSeekSequence(side);
+      }, 800);
+    }
+  }
+
+  updateSeekIndicator(side: "left" | "right", totalAmount: number) {
+    const indicator =
+      side === "left" ? this.leftIndicator : this.rightIndicator;
+    const seekAmountSpan = indicator.querySelector(".vjs-seek-amount");
+    const sign = side === "left" ? "-" : "+";
+    seekAmountSpan.textContent = `${sign}${totalAmount}s`;
+  }
+
+  resetSeekSequence(side: "left" | "right") {
+    const overlay = side === "left" ? this.leftOverlay : this.rightOverlay;
+    overlay.classList.remove("show");
+    this.seekCount = 0;
+    this.isSeekActive = false;
+    this.lastTapTime = 0;
+    this.lastTapSide = null;
+  }
+
+  showSeekFeedback(side: "left" | "right") {
+    const overlay = side === "left" ? this.leftOverlay : this.rightOverlay;
+
+    // Show overlay with indicator
+    overlay.classList.add("show");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createRipple(side: "left" | "right", event: any) {
+    const overlay = side === "left" ? this.leftOverlay : this.rightOverlay;
+    const rect = overlay.getBoundingClientRect();
+
+    // Get tap position
+    let x, y;
+    if (event.touches && event.touches[0]) {
+      x = event.touches[0].clientX - rect.left;
+      y = event.touches[0].clientY - rect.top;
+    } else if (event.changedTouches && event.changedTouches[0]) {
+      x = event.changedTouches[0].clientX - rect.left;
+      y = event.changedTouches[0].clientY - rect.top;
+    } else {
+      x = event.clientX - rect.left;
+      y = event.clientY - rect.top;
+    }
+
+    // Create ripple element
+    const ripple = videojs.dom.createEl("div", {
+      className: "vjs-ripple",
+    }) as HTMLElement;
+
+    const size = Math.max(rect.width, rect.height);
+    ripple.style.width = size + "px";
+    ripple.style.height = size + "px";
+    ripple.style.left = x - size / 2 + "px";
+    ripple.style.top = y - size / 2 + "px";
+
+    overlay.appendChild(ripple);
+
+    // Remove ripple after animation
+    setTimeout(() => {
+      overlay.removeChild(ripple);
+    }, 600);
   }
 
   addStyles() {
@@ -91,8 +315,124 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
           user-select: none;
           -webkit-touch-callout: none; /* prevent iOS long-press menu */
         }
+
+          .vjs-top-overlay {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            z-index: 1;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+          }
+
+          .vjs-top-overlay.show {
+            opacity: 1;
+          }
+
+          .vjs-speed-indicator {
+            position: absolute;
+            top: 10px;
+            left: calc(50% - 39px);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            width: 78px;
+            background-color: rgba(0,0,0,0.6);
+            padding: 7px 16px;
+            border-radius: 16px;
+            pointer-events: none;
+            user-select: none;
+          }
+
+          .vjs-top-overlay.show .vjs-speed-indicator {
+            opacity: 1;
+          }
+
+
+
+          .vjs-doubletap-overlay {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40%;
+            z-index: 1;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+          }
+
+          .vjs-doubletap-left {
+            left: 0;
+          }
+
+          .vjs-doubletap-right {
+            right: 0;
+          }
+
+          .vjs-fullscreen .vjs-doubletap-overlay {
+            display: block;
+          }
+
+          .vjs-doubletap-overlay.show {
+            opacity: 1;
+          }
+
+          .vjs-seek-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            user-select: none;
+          }
+
+          .vjs-doubletap-overlay.show .vjs-seek-indicator {
+            opacity: 1;
+          }
+
+          .vjs-seek-amount {
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+          }
+
+          .vjs-ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+            animation: ripple-animation 0.6s ease-out;
+          }
+
+          @keyframes ripple-animation {
+            from {
+              transform: scale(0);
+              opacity: 1;
+            }
+            to {
+              transform: scale(2);
+              opacity: 0;
+            }
+          }
       `;
     document.head.appendChild(style);
+  }
+
+  toggleSpeedFeedback(show: boolean) {
+    // Show overlay with indicator
+    if (show) this.topOverlay.classList.add("show");
+    else this.topOverlay.classList.remove("show");
   }
 
   initEvents() {
@@ -134,6 +474,12 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
             if (distanceMoved > TOUCH_MOVE_2X_THRESHOLD) return;
             isHolding = true;
             this.player.playbackRate(2);
+
+            // reset dragging
+            videoEl.style.transform = "scale(1) translateY(0)";
+            isDragging = false;
+
+            this.toggleSpeedFeedback(true);
           }, holdDelay);
         },
         { passive: false }
@@ -180,6 +526,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
 
         if (isHolding) {
           this.player.playbackRate(1);
+          this.toggleSpeedFeedback(false);
         }
 
         const deltaY = startY - currentY;
@@ -207,12 +554,15 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
 
     addTouchEventListeners(this.videoEl, this.videoEl);
 
+    addTouchEventListeners(this.leftOverlay, this.videoEl);
+    addTouchEventListeners(this.rightOverlay, this.videoEl);
+
     this.player.ready(() => {
       this.player.addChild("BigButtonGroup");
-      this.bigButtonGroupEl = this.player
+      const bigButtonGroupEl = this.player
         .el()
         .querySelector(".vjs-big-button-group");
-      addTouchEventListeners(this.bigButtonGroupEl, this.videoEl);
+      addTouchEventListeners(bigButtonGroupEl, this.videoEl);
     });
   }
 }

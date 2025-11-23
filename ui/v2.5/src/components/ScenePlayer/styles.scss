@@ -76,10 +76,10 @@ $sceneTabWidth: 450px;
     display: none;
     height: 80px;
     justify-content: space-around;
+    left: calc(50% - 25px);
     opacity: 0;
     position: absolute;
     top: calc(50% - 40px);
-    width: 100%;
     z-index: 1;
 
     .vjs-button {
