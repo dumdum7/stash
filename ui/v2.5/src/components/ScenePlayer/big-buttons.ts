@@ -208,7 +208,8 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       this.lastTapSide = side;
 
       // don't show player controls if event wasn't a tap
-      if (!this.isHolding && !this.isDragging) this.player.userActive(!this.player.userActive());
+      if (!this.isHolding && !this.isDragging)
+        this.player.userActive(!this.player.userActive());
     }
   }
 
@@ -477,7 +478,10 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
           this.isHolding = false;
 
           this.holdTimeout = setTimeout(() => {
-            if (this.xDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD || this.yDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD)
+            if (
+              this.xDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD ||
+              this.yDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD
+            )
               return;
             this.isHolding = true;
             this.player.playbackRate(2);
