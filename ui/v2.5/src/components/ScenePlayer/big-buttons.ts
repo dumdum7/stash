@@ -207,10 +207,8 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       this.lastTapTime = currentTime;
       this.lastTapSide = side;
 
-      // todo: find a nicer way of checking if touch event was a tap
-      const isTap = !this.topOverlay.classList.contains("show");
       // don't show player controls if event wasn't a tap
-      if (isTap) this.player.userActive(!this.player.userActive());
+      if (!this.isHolding && !this.isDragging) this.player.userActive(!this.player.userActive());
     }
   }
 
@@ -438,15 +436,18 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
     else this.topOverlay.classList.remove("show");
   }
 
-  initEvents() {
-    let startY = 0;
-    let currentY = 0;
-    let isDragging = false;
-    let holdTimeout: number | null | undefined = null;
-    let isHolding = false;
-    let distanceMoved = 0;
-    const TOUCH_MOVE_2X_THRESHOLD = 15;
+  private startX = 0;
+  private startY = 0;
+  private currentX = 0;
+  private currentY = 0;
+  private isDragging = false;
+  private holdTimeout: number | null | undefined = null;
+  private isHolding = false;
+  private xDistanceMoved = 0;
+  private yDistanceMoved = 0;
+  private TOUCH_MOVE_2X_THRESHOLD = 15;
 
+  initEvents() {
     const { maxScale, minScale, pullDistance, scaleSensitivity, holdDelay } =
       this.options;
 
@@ -464,24 +465,27 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
           if (e.touches.length !== 1) return;
           e.preventDefault();
 
-          startY = e.touches[0].clientY;
-          currentY = startY;
+          this.startX = e.touches[0].clientX;
+          this.startY = e.touches[0].clientY;
+          this.currentX = this.startX;
+          this.currentY = this.startY;
           // todo: find a way to get accurate status bar height, if there is one
           const STATUS_BAR_HEIGHT = 40;
           // ignores touches that started at top of screen - user likely pulled down to show status bar
-          if (startY < STATUS_BAR_HEIGHT) return;
-          isDragging = true;
-          isHolding = false;
+          if (this.startY < STATUS_BAR_HEIGHT) return;
+          this.isDragging = true;
+          this.isHolding = false;
 
-          holdTimeout = setTimeout(() => {
-            if (distanceMoved > TOUCH_MOVE_2X_THRESHOLD) return;
-            isHolding = true;
+          this.holdTimeout = setTimeout(() => {
+            if (this.xDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD || this.yDistanceMoved > this.TOUCH_MOVE_2X_THRESHOLD)
+              return;
+            this.isHolding = true;
             this.player.playbackRate(2);
             navigator.vibrate?.(10);
 
             // reset dragging
             videoEl.style.transform = "scale(1) translateY(0)";
-            isDragging = false;
+            this.isDragging = false;
 
             this.toggleSpeedFeedback(true);
           }, holdDelay);
@@ -493,15 +497,17 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       element.addEventListener(
         "touchmove",
         (e: TouchEvent) => {
-          if (!isDragging || e.touches.length !== 1) return;
+          if (!this.isDragging || e.touches.length !== 1) return;
           e.preventDefault();
 
-          distanceMoved = Math.abs(currentY - startY);
+          this.xDistanceMoved = Math.abs(this.currentX - this.startX);
+          this.yDistanceMoved = Math.abs(this.currentY - this.startY);
 
-          if (isHolding) return;
+          if (this.isHolding) return;
 
-          currentY = e.touches[0].clientY;
-          const deltaY = startY - currentY;
+          this.currentX = e.touches[0].clientX;
+          this.currentY = e.touches[0].clientY;
+          const deltaY = this.startY - this.currentY;
           const isFullscreen = this.player.isFullscreen();
 
           if (!isFullscreen) {
@@ -526,14 +532,14 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
 
       // === TOUCH END ===
       element.addEventListener("touchend", () => {
-        if (holdTimeout != null) clearTimeout(holdTimeout);
+        if (this.holdTimeout != null) clearTimeout(this.holdTimeout);
 
-        if (isHolding) {
+        if (this.isHolding) {
           this.player.playbackRate(1);
           this.toggleSpeedFeedback(false);
         }
 
-        const deltaY = startY - currentY;
+        const deltaY = this.startY - this.currentY;
         const isFullscreen = this.player.isFullscreen();
 
         if (!isFullscreen && deltaY > pullDistance) {
@@ -544,15 +550,15 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
 
         // Reset transform smoothly
         videoEl.style.transform = "scale(1) translateY(0)";
-        isDragging = false;
+        this.isDragging = false;
       });
 
       // === TOUCH CANCEL ===
       element.addEventListener("touchcancel", () => {
-        if (holdTimeout != null) clearTimeout(holdTimeout);
-        if (isHolding) this.player.playbackRate(1);
+        if (this.holdTimeout != null) clearTimeout(this.holdTimeout);
+        if (this.isHolding) this.player.playbackRate(1);
         videoEl.style.transform = "scale(1) translateY(0)";
-        isDragging = false;
+        this.isDragging = false;
       });
     };
 

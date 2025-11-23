@@ -41,6 +41,10 @@ $sceneTabWidth: 450px;
   }
 }
 
+.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  transition: visibility 0.1s, opacity 0.1s;
+}
+
 .video-js {
   height: 100%;
   position: absolute;
@@ -320,7 +324,7 @@ $sceneTabWidth: 450px;
       &.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-big-button-group {
         opacity: 0;
         pointer-events: none;
-        transition: visibility 1s, opacity 1s;
+        transition: visibility 0.1s, opacity 0.1s;
         visibility: visible;
       }
 
