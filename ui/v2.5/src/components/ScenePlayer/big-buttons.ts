@@ -301,7 +301,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
     // Remove ripple after animation
     setTimeout(() => {
       overlay.removeChild(ripple);
-    }, 600);
+    }, 500);
   }
 
   addStyles() {
@@ -359,7 +359,6 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
             top: 0;
             bottom: 0;
             width: 40%;
-            z-index: 1;
             cursor: pointer;
             opacity: 0;
             transition: opacity 0.2s;
@@ -412,7 +411,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.4);
             pointer-events: none;
-            animation: ripple-animation 0.6s ease-out;
+            animation: ripple-animation 500ms ease-out;
           }
 
           @keyframes ripple-animation {
