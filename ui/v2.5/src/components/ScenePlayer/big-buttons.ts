@@ -202,11 +202,15 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       this.performSeek(side, event);
       this.player.userActive(false);
     } else {
-      this.player.userActive(!this.player.userActive());
       // First tap
       this.seekCount = 0;
       this.lastTapTime = currentTime;
       this.lastTapSide = side;
+
+      // todo: find a nicer way of checking if touch event was a tap
+      const isTap = !this.topOverlay.classList.contains("show");
+      // don't show player controls if event wasn't a tap
+      if (isTap) this.player.userActive(!this.player.userActive());
     }
   }
 
@@ -473,6 +477,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
             if (distanceMoved > TOUCH_MOVE_2X_THRESHOLD) return;
             isHolding = true;
             this.player.playbackRate(2);
+            navigator.vibrate?.(10);
 
             // reset dragging
             videoEl.style.transform = "scale(1) translateY(0)";
