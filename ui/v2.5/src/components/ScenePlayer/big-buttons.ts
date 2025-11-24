@@ -208,7 +208,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       this.lastTapSide = side;
 
       // don't show player controls if event wasn't a tap
-      if (!this.isHolding && !this.isDragging)
+      if (!this.isHolding && !(this.isDragging && this.yDistanceMoved > 10))
         this.player.userActive(!this.player.userActive());
     }
   }
