@@ -151,22 +151,28 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
     this.player.el().appendChild(this.leftOverlay);
     this.player.el().appendChild(this.rightOverlay);
 
-    // Touch events for mobile
-    this.leftOverlay.addEventListener("touchend", (e: Event) =>
-      this.handleTap(e, "left")
-    );
-    this.rightOverlay.addEventListener("touchend", (e: Event) =>
-      this.handleTap(e, "right")
-    );
+    const touchStartListener = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
 
-    // Click events for desktop testing
-    this.leftOverlay.addEventListener("click", (e: Event) =>
-      this.handleTap(e, "left")
-    );
-    this.rightOverlay.addEventListener("click", (e: Event) =>
-      this.handleTap(e, "right")
-    );
+      this.tapStartX = e.touches[0].clientX;
+      this.tapStartY = e.touches[0].clientY;
+    };
+
+    this.leftOverlay.addEventListener("touchstart", touchStartListener);
+    this.rightOverlay.addEventListener("touchstart", touchStartListener);
+
+    // Touch events for mobile
+    this.leftOverlay.addEventListener("touchend", (e: TouchEvent) => {
+      this.handleTap(e, "left");
+    });
+    this.rightOverlay.addEventListener("touchend", (e: TouchEvent) => {
+      this.handleTap(e, "right");
+    });
   }
+
+  private tapStartX: number = 0;
+  private tapStartY: number = 0;
 
   private lastTapTime: number = 0;
   private lastTapSide: "left" | "right" | null = null;
@@ -176,9 +182,23 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
   private rightSeekAnimationTimeout: number | undefined = undefined;
   private isSeekActive: boolean = false;
 
-  handleTap(event: Event, side: "left" | "right") {
+  private MAX_DIST_BETWEEN_DOUBLE_TAPS = 50;
+
+  handleTap(event: TouchEvent, side: "left" | "right") {
     event.preventDefault();
     event.stopPropagation();
+
+    if (event.changedTouches.length == 1) {
+      const tapCurrentX = event.changedTouches[0].clientX;
+      const tapCurrentY = event.changedTouches[0].clientY;
+      if (
+        Math.abs(tapCurrentX - this.tapStartX) >
+          this.MAX_DIST_BETWEEN_DOUBLE_TAPS ||
+        Math.abs(tapCurrentY - this.tapStartY) >
+          this.MAX_DIST_BETWEEN_DOUBLE_TAPS
+      )
+        return;
+    }
 
     const currentTime = Date.now();
     const timeSinceLastTap = currentTime - this.lastTapTime;
@@ -208,12 +228,12 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
       this.lastTapSide = side;
 
       // don't show player controls if event wasn't a tap
-      if (!this.isHolding && !(this.isDragging && this.yDistanceMoved > 10))
+      if (!this.isHolding && !(this.isDragging && this.yDistanceMoved > 1))
         this.player.userActive(!this.player.userActive());
     }
   }
 
-  performSeek(side: "left" | "right", event: Event) {
+  performSeek(side: "left" | "right", event: TouchEvent) {
     const currentTime = this.player.currentTime();
     const totalSeekAmount = this.seekCount * this.options.seekAmount;
     const seekDirection = side === "left" ? -1 : 1;
@@ -486,6 +506,7 @@ class BigButtonsPlugin extends videojs.getPlugin("plugin") {
             this.isHolding = true;
             this.player.playbackRate(2);
             navigator.vibrate?.(10);
+            this.player.userActive(false);
 
             // reset dragging
             videoEl.style.transform = "scale(1) translateY(0)";
