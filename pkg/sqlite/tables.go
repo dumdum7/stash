@@ -37,6 +37,7 @@ var (
 	performersCustomFieldsTable = goqu.T("performer_custom_fields")
 
 	studiosAliasesJoinTable  = goqu.T(studioAliasesTable)
+	studiosURLsJoinTable     = goqu.T(studioURLsTable)
 	studiosTagsJoinTable     = goqu.T(studiosTagsTable)
 	studiosStashIDsJoinTable = goqu.T("studio_stash_ids")
 
@@ -46,6 +47,7 @@ var (
 
 	tagsAliasesJoinTable  = goqu.T(tagAliasesTable)
 	tagRelationsJoinTable = goqu.T(tagRelationsTable)
+	tagsStashIDsJoinTable = goqu.T("tag_stash_ids")
 )
 
 var (
@@ -319,6 +321,14 @@ var (
 		stringColumn: studiosAliasesJoinTable.Col(studioAliasColumn),
 	}
 
+	studiosURLsTableMgr = &orderedValueTable[string]{
+		table: table{
+			table:    studiosURLsJoinTable,
+			idColumn: studiosURLsJoinTable.Col(studioIDColumn),
+		},
+		valueColumn: studiosURLsJoinTable.Col(studioURLColumn),
+	}
+
 	studiosTagsTableMgr = &joinTable{
 		table: table{
 			table:    studiosTagsJoinTable,
@@ -366,6 +376,13 @@ var (
 	}
 
 	tagsChildTagsTableMgr = *tagsParentTagsTableMgr.invert()
+
+	tagsStashIDsTableMgr = &stashIDTable{
+		table: table{
+			table:    tagsStashIDsJoinTable,
+			idColumn: tagsStashIDsJoinTable.Col(tagIDColumn),
+		},
+	}
 )
 
 var (
