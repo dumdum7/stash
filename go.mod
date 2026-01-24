@@ -11,6 +11,7 @@ require (
 	github.com/asticode/go-astisub v0.25.1
 	github.com/chromedp/cdproto v0.0.0-20231007061347-18b01cd81617
 	github.com/chromedp/chromedp v0.9.2
+	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/corona10/goimagehash v1.1.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/dop251/goja v0.0.0-20231027120936-b396bb4c349d
@@ -84,6 +85,7 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.3.0 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

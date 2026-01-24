@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -17,8 +18,11 @@ import (
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/nosleep"
 	"github.com/stashapp/stash/pkg/utils"
 )
+
+var sleeper = nosleep.New()
 
 type SceneFinder interface {
 	models.SceneGetter
@@ -90,6 +94,18 @@ func (rs sceneRoutes) Routes() chi.Router {
 }
 
 func (rs sceneRoutes) StreamDirect(w http.ResponseWriter, r *http.Request) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := sleeper.Prevent(); err != nil {
+		logger.Warnf("could not set nosleep: %s", err.Error())
+	}
+	defer func() {
+		if err := sleeper.Allow(); err != nil {
+			logger.Warnf("could not unset nosleep: %s", err.Error())
+		}
+	}()
+
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	ss := manager.SceneServer{
 		TxnManager:       rs.txnManager,
@@ -132,6 +148,17 @@ func (rs sceneRoutes) StreamMKV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs sceneRoutes) streamTranscode(w http.ResponseWriter, r *http.Request, streamType ffmpeg.StreamFormat) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := sleeper.Prevent(); err != nil {
+		logger.Warnf("could not set nosleep: %s", err.Error())
+	}
+	defer func() {
+		if err := sleeper.Allow(); err != nil {
+			logger.Warnf("could not unset nosleep: %s", err.Error())
+		}
+	}()
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 
 	streamManager := manager.GetInstance().StreamManager
