@@ -6,16 +6,16 @@ package nosleep
 import (
 	"os"
 
-	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/coreos/go-systemd/v22/login1"
 )
 
 type linuxNoSleeper struct {
-	conn   *dbus.Conn
+	conn   *login1.Conn
 	lockFd *os.File
 }
 
 func New() NoSleeper {
-	conn, err := dbus.New()
+	conn, err := login1.New()
 	if err != nil {
 		return nil
 	}
@@ -24,11 +24,13 @@ func New() NoSleeper {
 
 func (s *linuxNoSleeper) Prevent() error {
 	var err error
-	s.lockFd, err = s.conn.Inhibit("sleep", "stash", "serving video", "block")
-	if err != nil {
-		return err
-	}
-	return nil
+	s.lockFd, err = s.conn.Inhibit(
+		"sleep",
+		"stash",
+		"serving video",
+		"block",
+	)
+	return err
 }
 
 func (s *linuxNoSleeper) Allow() error {
