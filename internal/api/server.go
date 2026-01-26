@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ import (
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
+	"github.com/stashapp/stash/pkg/nosleep"
 	"github.com/stashapp/stash/pkg/plugin"
 	"github.com/stashapp/stash/pkg/utils"
 	"github.com/stashapp/stash/ui"
@@ -82,6 +84,38 @@ func (dir osFS) Open(name string) (fs.File, error) {
 func Initialize() (*Server, error) {
 	mgr := manager.GetInstance()
 	cfg := mgr.Config
+
+	// gqlgen's websocket transport creates a new goroutine for each connection,
+	// so we need to make sure that the nosleep calls are made from the same thread.
+	// this is done by creating a new goroutine that is locked to an OS thread,
+	// and then using channels to communicate with it.
+	enableNoSleep := make(chan struct{})
+	disableNoSleep := make(chan struct{})
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		nosleepHandle := nosleep.New()
+		var count int64
+		for {
+			select {
+			case <-enableNoSleep:
+				if count == 0 {
+					if err := nosleepHandle.Prevent(); err != nil {
+						logger.Warnf("failed to prevent sleep: %s", err.Error())
+					}
+				}
+				count++
+			case <-disableNoSleep:
+				count--
+				if count == 0 {
+					if err := nosleepHandle.Allow(); err != nil {
+						logger.Warnf("failed to allow sleep: %s", err.Error())
+					}
+				}
+			}
+		}
+	}()
 
 	initCustomPerformerImages(cfg.GetCustomPerformerImageLocation())
 
@@ -179,6 +213,13 @@ func Initialize() (*Server, error) {
 			},
 		},
 		KeepAlivePingInterval: 10 * time.Second,
+		InitFunc: func(ctx context.Context, initPayload gqlTransport.InitPayload) (context.Context, *gqlTransport.InitPayload, error) {
+			enableNoSleep <- struct{}{}
+			return ctx, &initPayload, nil
+		},
+		CloseFunc: func(ctx context.Context, code int) {
+			disableNoSleep <- struct{}{}
+		},
 	})
 	gqlSrv.AddTransport(gqlTransport.Options{})
 	gqlSrv.AddTransport(gqlTransport.GET{})
