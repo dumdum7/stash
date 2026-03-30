@@ -41,6 +41,7 @@
 | `Ctrl + End` | Go to last page of results |
 | `s a` | Select all on page |
 | `s n` | Unselect all |
+| `s i` | Invert selection |
 | `e` | Edit selected |
 | `d d` | Delete selected |
 
@@ -63,6 +64,7 @@
 | `,` | Hide/Show sidebar |
 | `.` | Hide/Show scene scrubber |
 | `o` | Increment O-Counter |
+| `d d` | Delete scene |
 | Ratings ||
 | `r {1-5}` | Set rating (stars) |
 | `r 0` | Unset rating (stars) |

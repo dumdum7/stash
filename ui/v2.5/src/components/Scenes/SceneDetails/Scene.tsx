@@ -7,7 +7,7 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { Link, RouteComponentProps } from "react-router-dom";
+import { useHistory, RouteComponentProps } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import * as GQL from "src/core/generated-graphql";
 import {
@@ -32,7 +32,10 @@ import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
 import { useConfigurationContext } from "src/hooks/Config";
-import { getPlayerPosition } from "src/components/ScenePlayer/util";
+import {
+  getAbLoopPlugin,
+  getPlayerPosition,
+} from "src/components/ScenePlayer/util";
 import {
   faEllipsisV,
   faChevronRight,
@@ -50,8 +53,10 @@ import { lazyComponent } from "src/utils/lazyComponent";
 import cx from "classnames";
 import { TruncatedText } from "src/components/Shared/TruncatedText";
 import { PatchComponent, PatchContainerComponent } from "src/patch";
+import { SceneMergeModal } from "../SceneMergeDialog";
 import { goBackOrReplace } from "src/utils/history";
 import { FormattedDate } from "src/components/Shared/Date";
+import { StudioLogo } from "src/components/Shared/StudioLogo";
 
 const SubmitStashBoxDraft = lazyComponent(
   () => import("src/components/Dialogs/SubmitDraft")
@@ -182,9 +187,11 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
 
   const Toast = useToast();
   const intl = useIntl();
+  const history = useHistory();
   const [updateScene] = useSceneUpdate();
   const [generateScreenshot] = useSceneGenerateScreenshot();
   const { configuration } = useConfigurationContext();
+  const { showStudioText } = configuration?.ui ?? {};
 
   const [showDraftModal, setShowDraftModal] = useState(false);
   const boxes = configuration?.general?.stashBoxes ?? [];
@@ -205,6 +212,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
 
   const [activeTabKey, setActiveTabKey] = useState("scene-details-panel");
 
+  const [isMerging, setIsMerging] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState<boolean>(false);
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
 
@@ -248,6 +256,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     Mousetrap.bind("p p", () => onQueuePrevious());
     Mousetrap.bind("p r", () => onQueueRandom());
     Mousetrap.bind(",", () => setCollapsed(!collapsed));
+    Mousetrap.bind("d d", () => setIsDeleteAlertOpen(true));
     Mousetrap.bind("c c", () => {
       onGenerateScreenshot(getPlayerPosition());
     });
@@ -263,6 +272,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
       Mousetrap.unbind("i");
       Mousetrap.unbind("h");
       Mousetrap.unbind("o");
+      Mousetrap.unbind("d d");
       Mousetrap.unbind("p n");
       Mousetrap.unbind("p p");
       Mousetrap.unbind("p r");
@@ -308,7 +318,51 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   };
 
   function onClickMarker(marker: GQL.SceneMarkerDataFragment) {
+    const abLoopPlugin = getAbLoopPlugin();
+    const opts = abLoopPlugin?.getOptions();
+    const start = opts?.start;
+    const end = opts?.end;
+
+    const hasLoopRange =
+      opts?.enabled &&
+      typeof start === "number" &&
+      typeof end === "number" &&
+      Number.isFinite(start) &&
+      Number.isFinite(end);
+
+    if (
+      abLoopPlugin &&
+      opts &&
+      hasLoopRange &&
+      (marker.seconds < Math.min(start as number, end as number) ||
+        marker.seconds > Math.max(start as number, end as number))
+    ) {
+      abLoopPlugin.setOptions({
+        ...opts,
+        enabled: false,
+      });
+    }
+
     setTimestamp(marker.seconds);
+  }
+
+  function onLoopMarker(marker: GQL.SceneMarkerDataFragment) {
+    if (marker.end_seconds == null) return;
+
+    setTimestamp(marker.seconds);
+    const start = Math.min(marker.seconds, marker.end_seconds);
+    const end = Math.max(marker.seconds, marker.end_seconds);
+    const abLoopPlugin = getAbLoopPlugin();
+    const opts = abLoopPlugin?.getOptions();
+
+    if (opts && abLoopPlugin) {
+      abLoopPlugin.setOptions({
+        ...opts,
+        start,
+        end,
+        enabled: true,
+      });
+    }
   }
 
   async function onRescan() {
@@ -345,6 +399,24 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     if (deleted) {
       onDelete();
     }
+  }
+
+  function maybeRenderMergeDialog() {
+    if (!scene.id) return;
+    return (
+      <SceneMergeModal
+        show={isMerging}
+        onClose={(mergedId) => {
+          setIsMerging(false);
+          if (mergedId !== undefined && mergedId !== scene.id) {
+            // By default, the merge destination is the current scene, but
+            // the user can change it, in which case we need to redirect.
+            history.replace(`/scenes/${mergedId}`);
+          }
+        }}
+        scenes={[{ id: scene.id, title: objectTitle(scene) }]}
+      />
+    );
   }
 
   function maybeRenderDeleteDialog() {
@@ -394,7 +466,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
           className="bg-secondary text-white"
           onClick={() => setIsGenerateDialogOpen(true)}
         >
-          <FormattedMessage id="actions.generate" />
+          <FormattedMessage id="actions.generate" />…
         </Dropdown.Item>
         <Dropdown.Item
           key="generate-screenshot"
@@ -419,6 +491,14 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
             <FormattedMessage id="actions.submit_stash_box" />
           </Dropdown.Item>
         )}
+        <Dropdown.Item
+          key="merge-scene"
+          className="bg-secondary text-white"
+          onClick={() => setIsMerging(true)}
+        >
+          <FormattedMessage id="actions.merge" />
+          ...
+        </Dropdown.Item>
         <Dropdown.Item
           key="delete-scene"
           className="bg-secondary text-white"
@@ -532,6 +612,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
             <SceneMarkersPanel
               sceneId={scene.id}
               onClickMarker={onClickMarker}
+              onLoopMarker={onLoopMarker}
               isVisible={activeTabKey === "scene-markers-panel"}
             />
           </Tab.Pane>
@@ -588,6 +669,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         <title>{title}</title>
       </Helmet>
       {maybeRenderSceneGenerateDialog()}
+      {maybeRenderMergeDialog()}
       {maybeRenderDeleteDialog()}
       <div
         className={`scene-tabs order-xl-first order-last ${
@@ -596,17 +678,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
       >
         <div>
           <div className="scene-header-container">
-            {scene.studio && (
-              <h1 className="text-center scene-studio-image">
-                <Link to={`/studios/${scene.studio.id}`}>
-                  <img
-                    src={scene.studio.image_path ?? ""}
-                    alt={`${scene.studio.name} logo`}
-                    className="studio-logo"
-                  />
-                </Link>
-              </h1>
-            )}
+            <StudioLogo studio={scene.studio} showText={showStudioText} />
             <h3 className={cx("scene-header", { "no-studio": !scene.studio })}>
               <TruncatedText lineCount={2} text={title} />
             </h3>

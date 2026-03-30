@@ -214,6 +214,7 @@ For `sceneByFragment` and `sceneByQueryFragment`, the `queryURL` field must also
 
 * `{checksum}` - the MD5 checksum of the scene
 * `{oshash}` - the oshash of the scene
+* `{phash}` - the phash of the scene
 * `{filename}` - the base filename of the scene
 * `{title}` - the title of the scene
 * `{url}` - the url of the scene
@@ -375,7 +376,7 @@ scene:
     selector: //div[@data-host="{inputHostname}"]//span[@class="site-name"]
 ```
 
-> **Note:** These placeholders represent the actual URL used to fetch the content, after any URL replacements have been applied.
+> **⚠️ Note:** These placeholders represent the actual URL used to fetch the content, after any URL replacements have been applied.
 
 ### Common fragments
 
@@ -391,6 +392,7 @@ performer:
 The `Measurements` xpath string will replace `$infoPiece` with `//div[@class="infoPiece"]/span`, resulting in: `//div[@class="infoPiece"]/span[text() = 'Measurements:']/../span[@class="smallInfo"]`.
 
 > **⚠️ Note:** Recursive common fragments are **not** supported.  
+
 Referencing a common fragment within another common fragment will cause an error. For example:
 ```yaml
 common:
@@ -881,7 +883,7 @@ Title
 URLs
 ```
 
-> **Important**: `Title` field is required. 
+> **⚠️ Important:** `Title` field is required. 
 
 ### Group
 
@@ -900,7 +902,7 @@ Tags (see Tag fields)
 URLs
 ```
 
-> **Important**: `Name` field is required. 
+> **⚠️ Important:** `Name` field is required. 
 
 ### Image
 
@@ -944,9 +946,9 @@ URLs
 Weight
 ```
 
-> **Important**: `Name` field is required. 
+> **⚠️ Important:** `Name` field is required. 
 
-> **Note:**  - `Gender` must be one of `male`, `female`, `transgender_male`, `transgender_female`, `intersex`, `non_binary` (case insensitive).
+> **⚠️ Note:** `Gender` must be one of `male`, `female`, `transgender_male`, `transgender_female`, `intersex`, `non_binary` (case insensitive).
 
 ### Scene
 
@@ -964,7 +966,7 @@ Title
 URLs
 ```
 
-> **Important**: `Title` field is required only if fileless.
+> **⚠️ Important:** `Title` field is required only if fileless.
 
 ### Studio
 
@@ -976,7 +978,7 @@ Tags (see Tag fields)
 URL
 ```
 
-> **Important**: `Name` field is required. 
+> **⚠️ Important:** `Name` field is required. 
 
 ### Tag
 
@@ -984,4 +986,4 @@ URL
 Name
 ```
 
-> **Important**: `Name` field is required. 
+> **⚠️ Important:** `Name` field is required. 

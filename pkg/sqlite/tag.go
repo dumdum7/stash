@@ -104,9 +104,12 @@ type tagRepositoryType struct {
 	aliases  stringRepository
 	stashIDs stashIDRepository
 
-	scenes    joinRepository
-	images    joinRepository
-	galleries joinRepository
+	scenes     joinRepository
+	images     joinRepository
+	galleries  joinRepository
+	groups     joinRepository
+	performers joinRepository
+	studios    joinRepository
 }
 
 var (
@@ -152,11 +155,36 @@ var (
 			fkColumn:     galleryIDColumn,
 			foreignTable: galleryTable,
 		},
+		groups: joinRepository{
+			repository: repository{
+				tableName: groupsTagsTable,
+				idColumn:  tagIDColumn,
+			},
+			fkColumn:     groupIDColumn,
+			foreignTable: groupTable,
+		},
+		performers: joinRepository{
+			repository: repository{
+				tableName: performersTagsTable,
+				idColumn:  tagIDColumn,
+			},
+			fkColumn:     performerIDColumn,
+			foreignTable: performerTable,
+		},
+		studios: joinRepository{
+			repository: repository{
+				tableName: studiosTagsTable,
+				idColumn:  tagIDColumn,
+			},
+			fkColumn:     studioIDColumn,
+			foreignTable: studioTable,
+		},
 	}
 )
 
 type TagStore struct {
 	blobJoinQueryBuilder
+	customFieldsStore
 
 	tableMgr *table
 }
@@ -166,6 +194,10 @@ func NewTagStore(blobStore *BlobStore) *TagStore {
 		blobJoinQueryBuilder: blobJoinQueryBuilder{
 			blobStore: blobStore,
 			joinTable: tagTable,
+		},
+		customFieldsStore: customFieldsStore{
+			table: tagsCustomFieldsTable,
+			fk:    tagsCustomFieldsTable.Col(tagIDColumn),
 		},
 		tableMgr: tagTableMgr,
 	}
@@ -179,9 +211,9 @@ func (qb *TagStore) selectDataset() *goqu.SelectDataset {
 	return dialect.From(qb.table()).Select(qb.table().All())
 }
 
-func (qb *TagStore) Create(ctx context.Context, newObject *models.Tag) error {
+func (qb *TagStore) Create(ctx context.Context, newObject *models.CreateTagInput) error {
 	var r tagRow
-	r.fromTag(*newObject)
+	r.fromTag(*newObject.Tag)
 
 	id, err := qb.tableMgr.insertID(ctx, r)
 	if err != nil {
@@ -212,12 +244,17 @@ func (qb *TagStore) Create(ctx context.Context, newObject *models.Tag) error {
 		}
 	}
 
+	const partial = false
+	if err := qb.setCustomFields(ctx, id, newObject.CustomFields, partial); err != nil {
+		return err
+	}
+
 	updated, err := qb.find(ctx, id)
 	if err != nil {
 		return fmt.Errorf("finding after create: %w", err)
 	}
 
-	*newObject = *updated
+	*newObject.Tag = *updated
 
 	return nil
 }
@@ -261,12 +298,16 @@ func (qb *TagStore) UpdatePartial(ctx context.Context, id int, partial models.Ta
 		}
 	}
 
+	if err := qb.SetCustomFields(ctx, id, partial.CustomFields); err != nil {
+		return nil, err
+	}
+
 	return qb.find(ctx, id)
 }
 
-func (qb *TagStore) Update(ctx context.Context, updatedObject *models.Tag) error {
+func (qb *TagStore) Update(ctx context.Context, updatedObject *models.UpdateTagInput) error {
 	var r tagRow
-	r.fromTag(*updatedObject)
+	r.fromTag(*updatedObject.Tag)
 
 	if err := qb.tableMgr.updateByID(ctx, updatedObject.ID, r); err != nil {
 		return err
@@ -294,6 +335,10 @@ func (qb *TagStore) Update(ctx context.Context, updatedObject *models.Tag) error
 		if err := tagsStashIDsTableMgr.replaceJoins(ctx, updatedObject.ID, updatedObject.StashIDs.List()); err != nil {
 			return err
 		}
+	}
+
+	if err := qb.SetCustomFields(ctx, updatedObject.ID, updatedObject.CustomFields); err != nil {
+		return err
 	}
 
 	return nil
@@ -552,6 +597,36 @@ func (qb *TagStore) FindByStashID(ctx context.Context, stashID models.StashID) (
 	return ret, nil
 }
 
+func (qb *TagStore) FindByStashIDStatus(ctx context.Context, hasStashID bool, stashboxEndpoint string) ([]*models.Tag, error) {
+	table := qb.table()
+	sq := dialect.From(table).LeftJoin(
+		tagsStashIDsJoinTable,
+		goqu.On(table.Col(idColumn).Eq(tagsStashIDsJoinTable.Col(tagIDColumn))),
+	).Select(table.Col(idColumn))
+
+	if hasStashID {
+		sq = sq.Where(
+			tagsStashIDsJoinTable.Col("stash_id").IsNotNull(),
+			tagsStashIDsJoinTable.Col("endpoint").Eq(stashboxEndpoint),
+		)
+	} else {
+		sq = sq.Where(
+			tagsStashIDsJoinTable.Col("stash_id").IsNull(),
+		)
+	}
+
+	idsQuery := qb.selectDataset().Where(
+		table.Col(idColumn).In(sq),
+	)
+
+	ret, err := qb.getMany(ctx, idsQuery)
+	if err != nil {
+		return nil, fmt.Errorf("getting tags for stash-box endpoint %s: %w", stashboxEndpoint, err)
+	}
+
+	return ret, nil
+}
+
 func (qb *TagStore) GetParentIDs(ctx context.Context, relatedID int) ([]int, error) {
 	return tagsParentTagsTableMgr.get(ctx, relatedID)
 }
@@ -695,6 +770,7 @@ var tagSortOptions = sortOptions{
 	"scene_markers_count",
 	"scenes_count",
 	"scenes_duration",
+	"scenes_size",
 	"updated_at",
 }
 
@@ -707,6 +783,17 @@ func (qb *TagStore) sortByScenesDuration(direction string) string {
 		LEFT JOIN video_files ON video_files.file_id = %s.file_id
 		WHERE %s.%s = %s.id
 	) %s`, scenesTagsTable, sceneTable, sceneTable, scenesTagsTable, sceneIDColumn, scenesFilesTable, scenesFilesTable, sceneIDColumn, sceneTable, scenesFilesTable, scenesTagsTable, tagIDColumn, tagTable, getSortDirection(direction))
+}
+
+func (qb *TagStore) sortByScenesSize(direction string) string {
+	return fmt.Sprintf(` ORDER BY (
+		SELECT COALESCE(SUM(%s.size), 0)
+		FROM %s
+		LEFT JOIN %s ON %s.id = %s.%s
+		LEFT JOIN %s ON %s.%s = %s.id
+		LEFT JOIN %s ON %s.id = %s.file_id
+		WHERE %s.%s = %s.id
+	) %s`, fileTable, scenesTagsTable, sceneTable, sceneTable, scenesTagsTable, sceneIDColumn, scenesFilesTable, scenesFilesTable, sceneIDColumn, sceneTable, fileTable, fileTable, scenesFilesTable, scenesTagsTable, tagIDColumn, tagTable, getSortDirection(direction))
 }
 
 func (qb *TagStore) getDefaultTagSort() string {
@@ -737,6 +824,8 @@ func (qb *TagStore) getTagSort(query *queryBuilder, findFilter *models.FindFilte
 		sortQuery += getCountSort(tagTable, scenesTagsTable, tagIDColumn, direction)
 	case "scenes_duration":
 		sortQuery += qb.sortByScenesDuration(direction)
+	case "scenes_size":
+		sortQuery += qb.sortByScenesSize(direction)
 	case "scene_markers_count":
 		sortQuery += fmt.Sprintf(" ORDER BY (SELECT COUNT(*) FROM scene_markers_tags WHERE tags.id = scene_markers_tags.tag_id)+(SELECT COUNT(*) FROM scene_markers WHERE tags.id = scene_markers.primary_tag_id) %s", getSortDirection(direction))
 	case "images_count":
@@ -859,6 +948,8 @@ func (qb *TagStore) Merge(ctx context.Context, source []int, destination int) er
 	}
 
 	args = append(args, destination)
+
+	// for each table, update source tag ids to destination tag id, ignoring duplicates
 	for table, idColumn := range tagTables {
 		_, err := dbWrapper.Exec(ctx, `UPDATE OR IGNORE `+table+`
 SET tag_id = ?
