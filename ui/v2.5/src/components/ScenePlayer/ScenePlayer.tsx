@@ -139,6 +139,13 @@ function handleHotkeys(player: VideoJsPlayer, event: videojs.KeyboardEvent) {
     }
   }
 
+  const getFrameRate = () =>
+    Number(
+      [...document.querySelectorAll(".scene-file-info dd")]
+        .find((candidate) => candidate.innerHTML.includes("fps"))
+        ?.textContent?.split(" ")[0]
+    ) || 0;
+
   switch (event.which) {
     case 32: // space
     case 13: // enter
@@ -190,6 +197,14 @@ function handleHotkeys(player: VideoJsPlayer, event: videojs.KeyboardEvent) {
       break;
     case 57: // 9
       seekPercent(0.9);
+      break;
+    case 188: // , (comma) - Previous frame
+      player.currentTime(
+        Math.max(0, player.currentTime() - 1 / getFrameRate())
+      );
+      break;
+    case 190: // . (period) - Next frame
+      player.currentTime(player.currentTime() + 1 / getFrameRate());
       break;
     case 221: // ]
       seekPercentRelative(0.1);

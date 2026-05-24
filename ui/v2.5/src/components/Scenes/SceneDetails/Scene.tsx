@@ -255,7 +255,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     Mousetrap.bind("p n", () => onQueueNext());
     Mousetrap.bind("p p", () => onQueuePrevious());
     Mousetrap.bind("p r", () => onQueueRandom());
-    Mousetrap.bind(",", () => setCollapsed(!collapsed));
+    // Mousetrap.bind(",", () => setCollapsed(!collapsed));
     Mousetrap.bind("d d", () => setIsDeleteAlertOpen(true));
     Mousetrap.bind("c c", () => {
       onGenerateScreenshot(getPlayerPosition());
@@ -789,7 +789,7 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
 
   const [collapsed, setCollapsed] = useState(false);
   const [continuePlaylist, setContinuePlaylist] = useState(queryContinue);
-  const [hideScrubber, setHideScrubber] = useState(
+  const [hideScrubber] = useState(
     !(configuration?.interface.showScrubber ?? true)
   );
 
@@ -827,10 +827,10 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
 
   // set up hotkeys
   useEffect(() => {
-    Mousetrap.bind(".", () => setHideScrubber((value) => !value));
+    // Mousetrap.bind(".", () => setHideScrubber((value) => !value));
 
     return () => {
-      Mousetrap.unbind(".");
+      // Mousetrap.unbind(".");
     };
   }, []);
 
