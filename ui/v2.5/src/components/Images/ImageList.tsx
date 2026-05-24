@@ -231,30 +231,47 @@ const ImageList: React.FC<IImageListImages> = PatchComponent(
     setSlideshowRunning,
     chapters = [],
   }) => {
+    const history = useHistory();
+
     const handleLightBoxPage = useCallback(
       (props: { direction?: number; page?: number }) => {
         const { direction, page: newPage } = props;
 
+        let targetPage = filter.currentPage;
         if (direction !== undefined) {
           if (direction < 0) {
             if (filter.currentPage === 1) {
-              onChangePage(pageCount);
+              targetPage = pageCount;
             } else {
-              onChangePage(filter.currentPage + direction);
+              targetPage = filter.currentPage + direction;
             }
           } else if (direction > 0) {
             if (filter.currentPage === pageCount) {
               // return to the first page
-              onChangePage(1);
+              targetPage = 1;
             } else {
-              onChangePage(filter.currentPage + direction);
+              targetPage = filter.currentPage + direction;
             }
           }
         } else if (newPage !== undefined) {
-          onChangePage(newPage);
+          targetPage = newPage;
+        }
+
+        if (targetPage !== filter.currentPage) {
+          const params = new URLSearchParams(history.location.search);
+          if (targetPage === 1) {
+            params.delete("p");
+          } else {
+            params.set("p", String(targetPage));
+          }
+          const newSearch = params.toString() ? `?${params.toString()}` : "";
+
+          // Push the intermediate state (without hash) first, then the state with hash
+          history.push({ search: newSearch });
+          history.push({ search: newSearch, hash: "lightbox" });
         }
       },
-      [onChangePage, filter.currentPage, pageCount]
+      [filter.currentPage, pageCount, history]
     );
 
     const handleClose = useCallback(() => {

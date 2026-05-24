@@ -18,8 +18,9 @@ import useInterval from "../Interval";
 import usePageVisibility from "../PageVisibility";
 import { useToast } from "../Toast";
 import { FormattedMessage, useIntl } from "react-intl";
-import { LightboxImage } from "./LightboxImage";
 import { useConfigurationContext } from "../Config";
+import PhotoSwipe from "photoswipe";
+import "photoswipe/style.css";
 import { Link } from "react-router-dom";
 import { OCounterButton } from "src/components/Scenes/SceneDetails/OCounterButton";
 import {
@@ -41,14 +42,13 @@ import {
   faExpand,
   faPause,
   faPlay,
-  faSearchMinus,
   faTimes,
   faBars,
   faImages,
 } from "@fortawesome/free-solid-svg-icons";
 import { RatingSystem } from "src/components/Shared/Rating/RatingSystem";
-import { useDebounce } from "../debounce";
 import { isVideo } from "src/utils/visualFile";
+import ScreenUtils from "src/utils/screen";
 import { imageTitle } from "src/core/files";
 import { galleryTitle } from "src/core/galleries";
 
@@ -68,7 +68,6 @@ const CLASSNAME_FOOTER_CENTER = `${CLASSNAME_FOOTER}-center`;
 const CLASSNAME_FOOTER_RIGHT = `${CLASSNAME_FOOTER}-right`;
 const CLASSNAME_DISPLAY = `${CLASSNAME}-display`;
 const CLASSNAME_CAROUSEL = `${CLASSNAME}-carousel`;
-const CLASSNAME_INSTANT = `${CLASSNAME_CAROUSEL}-instant`;
 const CLASSNAME_IMAGE = `${CLASSNAME_CAROUSEL}-image`;
 const CLASSNAME_NAVBUTTON = `${CLASSNAME}-navbutton`;
 const CLASSNAME_NAV = `${CLASSNAME}-nav`;
@@ -78,9 +77,6 @@ const CLASSNAME_NAVSELECTED = `${CLASSNAME_NAV}-selected`;
 const DEFAULT_SLIDESHOW_DELAY = 5000;
 const SECONDS_TO_MS = 1;
 const MIN_VALID_INTERVAL_SECONDS = 1;
-const MIN_ZOOM = 0.1;
-const SCROLL_ZOOM_TIMEOUT = 250;
-const ZOOM_NONE_EPSILON = 0.015;
 
 interface IProps {
   images: ILightboxImage[];
@@ -115,36 +111,19 @@ export const LightboxComponent: React.FC<IProps> = ({
 
   // zero-based
   const [index, setIndex] = useState<number | null>(null);
-  const [movingLeft, setMovingLeft] = useState(false);
   const oldIndex = useRef<number | null>(null);
-  const [instantTransition, setInstantTransition] = useState(true);
   const [isSwitchingPage, setIsSwitchingPage] = useState(true);
   const [isFullscreen, setFullscreen] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [navOffset, setNavOffset] = useState<React.CSSProperties | undefined>();
 
   const oldImages = useRef<ILightboxImage[]>([]);
 
-  const [zoom, setZoom] = useState(1);
-
-  function updateZoom(v: number) {
-    if (v < MIN_ZOOM) {
-      setZoom(MIN_ZOOM);
-    } else if (Math.abs(v - 1) < ZOOM_NONE_EPSILON) {
-      // "snap to 1" effect: if new zoom is close to 1, set to 1
-      setZoom(1);
-    } else {
-      setZoom(v);
-    }
-  }
-
-  const [resetPosition, setResetPosition] = useState(false);
-
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayTarget = useRef<HTMLButtonElement | null>(null);
-  const carouselRef = useRef<HTMLDivElement | null>(null);
   const indicatorRef = useRef<HTMLDivElement | null>(null);
   const navRef = useRef<HTMLDivElement | null>(null);
   const clearIntervalCallback = useRef<() => void>();
@@ -195,13 +174,6 @@ export const LightboxComponent: React.FC<IProps> = ({
   const slideshowDelay =
     savedDelay ?? configuredDelay ?? DEFAULT_SLIDESHOW_DELAY;
 
-  const scrollAttemptsBeforeChange = Math.max(
-    0,
-    config?.interface.imageLightbox.scrollAttemptsBeforeChange ?? 0
-  );
-
-  const disableAnimation = config?.interface.imageLightbox.disableAnimation;
-
   function setSlideshowDelay(v: number) {
     setLightboxSettings({ slideshowDelay: v });
   }
@@ -242,38 +214,209 @@ export const LightboxComponent: React.FC<IProps> = ({
   const [displayedSlideshowInterval, setDisplayedSlideshowInterval] =
     useState<string>((slideshowDelay / SECONDS_TO_MS).toString());
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pswpRef = useRef<any>(null);
+  const hashSetRef = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const closeRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleLeftRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleRightRef = useRef<any>(null);
+  const isSwitchingPageRef = useRef<boolean>(isSwitchingPage);
+  const pageChangeCountRef = useRef(0);
+
+  const close = useCallback(
+    (navigating = false) => {
+      if (isFullscreen) document.exitFullscreen();
+
+      if (!navigating && window.location.hash === "#lightbox") {
+        if (pageChangeCountRef.current > 0) {
+          window.history.replaceState(
+            null,
+            "",
+            window.location.pathname + window.location.search
+          );
+        } else {
+          window.history.back();
+        }
+      }
+
+      hide();
+      document.body.style.overflow = "auto";
+      Mousetrap.unpause();
+    },
+    [isFullscreen, hide]
+  );
+
+  closeRef.current = close;
+
+  useEffect(() => {
+    if (!isVisible || images.length === 0) {
+      return;
+    }
+
+    const dataSource = [
+      {
+        html: '<div style="width:100%;height:100%;background:transparent;"></div>',
+      },
+      ...images.map((img) => {
+        const isVid = isVideo(img.visual_files?.[0] ?? {});
+        if (isVid) {
+          return {
+            html: `<div class="pswp-video-container" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
+              <video src="${
+                img.paths.image || ""
+              }" controls autoPlay loop style="max-width:100%;max-height:100%;object-fit:contain;"></video>
+            </div>`,
+          };
+        } else {
+          return {
+            src: img.paths.image || "",
+            width: img.visual_files?.[0]?.width || 1200,
+            height: img.visual_files?.[0]?.height || 800,
+            alt: img.title || "",
+          };
+        }
+      }),
+      {
+        html: '<div style="width:100%;height:100%;background:transparent;"></div>',
+      },
+    ];
+
+    let startIndex = index === null ? initialIndex : index;
+    if (startIndex === -1) {
+      startIndex = images.length - 1;
+    }
+    // Shift by 1 because of the leading blank slide
+    startIndex = startIndex + 1;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const PhotoSwipeClass = (PhotoSwipe as any).default || PhotoSwipe;
+    console.log("creating new photoswipe with index", startIndex);
+    const pswp = new PhotoSwipeClass({
+      dataSource,
+      index: startIndex,
+      close: false,
+      zoom: false,
+      arrowPrev: false,
+      arrowNext: false,
+      counter: false,
+      bgOpacity: 1,
+      showAnimationDuration: 0,
+      hideAnimationDuration: 0,
+      loop: false, // Disable loop mode so we can swipe past boundaries and trigger page changes
+      imageClickAction: ScreenUtils.isTouch()
+        ? () => {
+            setShowControls((prev) => !prev);
+          }
+        : "zoom",
+      bgClickAction: () => {
+        setShowControls((prev) => !prev);
+      },
+      tapAction: () => {
+        setShowControls((prev) => !prev);
+      },
+    });
+
+    pswp.on("change", () => {
+      if (isSwitchingPageRef.current) return;
+
+      const newIndex = pswp.currIndex;
+
+      if (newIndex === 0) {
+        handleLeftRef.current();
+        return;
+      }
+
+      if (newIndex === dataSource.length - 1) {
+        handleRightRef.current();
+        return;
+      }
+
+      const actualIndex = newIndex - 1;
+
+      setIndex(actualIndex);
+      if (pswpRef.current) {
+        pswpRef.current.prevIndex = newIndex;
+      }
+    });
+
+    pswp.on("close", () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((pswp as any)._transitioning) return;
+      closeRef.current();
+    });
+
+    pswp.init();
+    pswpRef.current = pswp;
+    pswpRef.current.prevIndex = startIndex;
+
+    return () => {
+      if (pswpRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pswpRef.current._transitioning = true;
+        pswpRef.current.close();
+        pswpRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, images, initialIndex]);
+
+  useEffect(() => {
+    if (isSwitchingPage) return;
+
+    if (
+      pswpRef.current &&
+      index !== null &&
+      index !== -1 &&
+      pswpRef.current.currIndex !== index + 1
+    ) {
+      pswpRef.current.goTo(index + 1);
+      pswpRef.current.prevIndex = index + 1;
+    }
+  }, [index, isSwitchingPage]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    if (!hashSetRef.current) {
+      if (window.location.hash !== "#lightbox") {
+        window.location.hash = "lightbox";
+      }
+      hashSetRef.current = true;
+    }
+
+    const handleHashChange = () => {
+      if (window.location.hash !== "#lightbox") {
+        closeRef.current();
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      hashSetRef.current = false;
+    };
+  }, [isVisible]);
+
   useEffect(() => {
     if (images !== oldImages.current && isSwitchingPage) {
-      if (index === -1) setIndex(images.length - 1);
+      if (index === -1) {
+        setIndex(images.length - 1);
+      }
       setIsSwitchingPage(false);
     }
   }, [isSwitchingPage, images, index]);
-
-  const disableInstantTransition = useDebounce(
-    () => setInstantTransition(false),
-    400
-  );
-
-  const setInstant = useCallback(() => {
-    setInstantTransition(true);
-    disableInstantTransition();
-  }, [disableInstantTransition]);
 
   useEffect(() => {
     if (images.length < 2) return;
     if (index === oldIndex.current) return;
     if (index === null) return;
 
-    // reset zoom status
-    // setResetZoom((r) => !r);
-    // setZoomed(false);
-    if (resetZoomOnNav) {
-      setZoom(1);
-    }
-    setResetPosition((r) => !r);
-
     oldIndex.current = index;
-  }, [index, images.length, resetZoomOnNav]);
+  }, [index, images.length]);
 
   const getNavOffset = useCallback(() => {
     if (images.length < 2) return;
@@ -301,17 +444,8 @@ export const LightboxComponent: React.FC<IProps> = ({
   }, [getNavOffset]);
 
   useEffect(() => {
-    if (displayMode !== oldDisplayMode.current) {
-      // reset zoom status
-      // setResetZoom((r) => !r);
-      // setZoomed(false);
-      if (resetZoomOnNav) {
-        setZoom(1);
-      }
-      setResetPosition((r) => !r);
-    }
     oldDisplayMode.current = displayMode;
-  }, [displayMode, resetZoomOnNav]);
+  }, [displayMode]);
 
   const selectIndex = (e: React.MouseEvent, i: number) => {
     setIndex(i);
@@ -320,7 +454,21 @@ export const LightboxComponent: React.FC<IProps> = ({
 
   useEffect(() => {
     if (isVisible) {
-      if (index === null) setIndex(initialIndex);
+      pageChangeCountRef.current = 0;
+    } else {
+      setShowControls(true);
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    setShowControls(!isFullscreen);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (isVisible) {
+      if (index === null) {
+        setIndex(initialIndex);
+      }
       document.body.style.overflow = "hidden";
       Mousetrap.pause();
     }
@@ -341,14 +489,6 @@ export const LightboxComponent: React.FC<IProps> = ({
     }
   });
 
-  const close = useCallback(() => {
-    if (isFullscreen) document.exitFullscreen();
-
-    hide();
-    document.body.style.overflow = "auto";
-    Mousetrap.unpause();
-  }, [isFullscreen, hide]);
-
   const handleClose = (e: React.MouseEvent<HTMLDivElement>) => {
     const { className } = e.target as Element;
     if (className && className.includes && className.includes(CLASSNAME_IMAGE))
@@ -359,58 +499,52 @@ export const LightboxComponent: React.FC<IProps> = ({
     (isUserAction = true) => {
       if (isSwitchingPage || index === -1) return;
 
-      if (disableAnimation) {
-        setInstant();
-      }
-
       setShowChapters(false);
-      setMovingLeft(true);
 
       if (index === 0) {
         // go to next page, or loop back if no callback is set
         if (pageCallback) {
-          pageCallback({ direction: -1 });
           setIndex(-1);
           oldImages.current = images;
           setIsSwitchingPage(true);
-        } else setIndex(images.length - 1);
-      } else setIndex((index ?? 0) - 1);
+          isSwitchingPageRef.current = true;
+          pageChangeCountRef.current += 1;
+          pageCallback({ direction: -1 });
+        } else {
+          setIndex(images.length - 1);
+        }
+      } else {
+        setIndex((index ?? 0) - 1);
+      }
 
       if (isUserAction && resetIntervalCallback.current) {
         resetIntervalCallback.current();
       }
     },
-    [
-      images,
-      pageCallback,
-      isSwitchingPage,
-      resetIntervalCallback,
-      index,
-      disableAnimation,
-      setInstant,
-    ]
+    [images, pageCallback, isSwitchingPage, resetIntervalCallback, index]
   );
 
   const handleRight = useCallback(
     (isUserAction = true) => {
       if (isSwitchingPage) return;
 
-      if (disableAnimation) {
-        setInstant();
-      }
-
-      setMovingLeft(false);
       setShowChapters(false);
 
       if (index === images.length - 1) {
         // go to preview page, or loop back if no callback is set
         if (pageCallback) {
-          pageCallback({ direction: 1 });
           oldImages.current = images;
           setIsSwitchingPage(true);
+          isSwitchingPageRef.current = true;
           setIndex(0);
-        } else setIndex(0);
-      } else setIndex((index ?? 0) + 1);
+          pageChangeCountRef.current += 1;
+          pageCallback({ direction: 1 });
+        } else {
+          setIndex(0);
+        }
+      } else {
+        setIndex((index ?? 0) + 1);
+      }
 
       if (isUserAction && resetIntervalCallback.current) {
         resetIntervalCallback.current();
@@ -423,29 +557,22 @@ export const LightboxComponent: React.FC<IProps> = ({
       isSwitchingPage,
       resetIntervalCallback,
       index,
-      disableAnimation,
-      setInstant,
     ]
   );
 
-  const firstScroll = useRef<number | null>(null);
-  const inScrollGroup = useRef(false);
-
-  const debouncedScrollReset = useDebounce(() => {
-    firstScroll.current = null;
-    inScrollGroup.current = false;
-  }, SCROLL_ZOOM_TIMEOUT);
+  handleLeftRef.current = handleLeft;
+  handleRightRef.current = handleRight;
+  isSwitchingPageRef.current = isSwitchingPage;
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (e.repeat && (e.key === "ArrowRight" || e.key === "ArrowLeft"))
-        setInstant();
       if (e.key === "ArrowLeft") handleLeft();
       else if (e.key === "ArrowRight") handleRight();
       else if (e.key === "Escape") close();
     },
-    [setInstant, handleLeft, handleRight, close]
+    [handleLeft, handleRight, close]
   );
+
   const handleFullScreenChange = () => {
     if (clearIntervalCallback.current) {
       clearIntervalCallback.current();
@@ -475,7 +602,7 @@ export const LightboxComponent: React.FC<IProps> = ({
   }, [isVisible, handleKey]);
 
   const toggleFullscreen = useCallback(() => {
-    if (!isFullscreen) containerRef.current?.requestFullscreen();
+    if (!isFullscreen) document.documentElement.requestFullscreen();
     else document.exitFullscreen();
   }, [isFullscreen]);
 
@@ -540,6 +667,7 @@ export const LightboxComponent: React.FC<IProps> = ({
         pageCallback({ page: jumppage });
         oldImages.current = images;
         setIsSwitchingPage(true);
+        pageChangeCountRef.current += 1;
       }
     }
 
@@ -782,7 +910,9 @@ export const LightboxComponent: React.FC<IProps> = ({
     return (
       <>
         <div className={CLASSNAME_HEADER}>
-          <div className={CLASSNAME_LEFT_SPACER}>{renderChapterMenu()}</div>
+          {chapters.length > 0 && (
+            <div className={CLASSNAME_LEFT_SPACER}>{renderChapterMenu()}</div>
+          )}
           <div className={CLASSNAME_INDICATOR}>
             <span>
               {chapterHeader()} {pageHeader}
@@ -843,18 +973,7 @@ export const LightboxComponent: React.FC<IProps> = ({
                 <Icon icon={slideshowInterval !== null ? faPause : faPlay} />
               </Button>
             )}
-            {zoom !== 1 && (
-              <Button
-                variant="link"
-                onClick={() => {
-                  setResetPosition(!resetPosition);
-                  setZoom(1);
-                }}
-                title="Reset zoom"
-              >
-                <Icon icon={faSearchMinus} />
-              </Button>
-            )}
+
             {document.fullscreenEnabled && (
               <Button
                 variant="link"
@@ -884,39 +1003,7 @@ export const LightboxComponent: React.FC<IProps> = ({
             </Button>
           )}
 
-          <div
-            className={cx(CLASSNAME_CAROUSEL, {
-              [CLASSNAME_INSTANT]: instantTransition,
-            })}
-            ref={carouselRef}
-          >
-            <div className={`${CLASSNAME_IMAGE}`}>
-              {images[currentIndex] ? (
-                <LightboxImage
-                  src={images[currentIndex].paths.image ?? ""}
-                  width={images[currentIndex].visual_files?.[0]?.width ?? 0}
-                  height={images[currentIndex].visual_files?.[0]?.height ?? 0}
-                  displayMode={displayMode}
-                  scaleUp={scaleUp}
-                  scrollMode={scrollMode}
-                  resetPosition={resetPosition}
-                  zoom={zoom}
-                  scrollAttemptsBeforeChange={scrollAttemptsBeforeChange}
-                  firstScroll={firstScroll}
-                  inScrollGroup={inScrollGroup}
-                  current={true}
-                  alignBottom={movingLeft}
-                  setZoom={updateZoom}
-                  debouncedScrollReset={debouncedScrollReset}
-                  onLeft={handleLeft}
-                  onRight={handleRight}
-                  isVideo={isVideo(
-                    images[currentIndex].visual_files?.[0] ?? {}
-                  )}
-                />
-              ) : undefined}
-            </div>
-          </div>
+          {/* PhotoSwipe handles the rendering of images and videos via the dynamic pswp container */}
 
           {allowNavigation && (
             <Button
@@ -974,7 +1061,7 @@ export const LightboxComponent: React.FC<IProps> = ({
                 <Link
                   className="image-link"
                   to={`/images/${currentImage.id}`}
-                  onClick={() => close()}
+                  onClick={() => close(true)}
                 >
                   {title ?? ""}
                 </Link>
@@ -982,7 +1069,7 @@ export const LightboxComponent: React.FC<IProps> = ({
                   <Link
                     className="image-gallery-link"
                     to={`/galleries/${currentImage.galleries[0].id}`}
-                    onClick={() => close()}
+                    onClick={() => close(true)}
                   >
                     <Icon icon={faImages} />
                     {galleryTitle(currentImage.galleries[0])}
@@ -1003,7 +1090,7 @@ export const LightboxComponent: React.FC<IProps> = ({
 
   return (
     <div
-      className={CLASSNAME}
+      className={cx(CLASSNAME, { "hide-controls": !showControls })}
       role="presentation"
       ref={containerRef}
       onClick={handleClose}
