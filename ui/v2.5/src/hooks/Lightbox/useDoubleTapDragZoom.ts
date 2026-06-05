@@ -30,7 +30,7 @@ type Phase =
   | "secondTapDown"
   | "zooming";
 
-interface DoubleTapDragState {
+interface IDoubleTapDragState {
   phase: Phase;
   firstTapDownPos: { x: number; y: number };
   firstTapUpTime: number;
@@ -42,7 +42,7 @@ interface DoubleTapDragState {
   activePointerId: number | null;
 }
 
-function createState(): DoubleTapDragState {
+function createState(): IDoubleTapDragState {
   return {
     phase: "idle",
     firstTapDownPos: { x: 0, y: 0 },
@@ -56,7 +56,7 @@ function createState(): DoubleTapDragState {
   };
 }
 
-function resetState(state: DoubleTapDragState) {
+function resetState(state: IDoubleTapDragState) {
   state.phase = "idle";
   state.activePointerId = null;
   if (state.waitTimer) {
@@ -96,8 +96,7 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
 
     // Apply friction beyond bounds (same constants PhotoSwipe uses)
     // We use fit as the minimum to prevent shrinking smaller than the screen
-    const min = zoomLevels.fit;
-    const max = zoomLevels.max;
+    const { fit: min, max } = zoomLevels;
     if (newZoom < min) {
       newZoom = min - (min - newZoom) * 0.15;
       // Hard cap the rubber band so it never gets absurdly small (max 25% smaller than fit)
@@ -122,7 +121,7 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
 
     // Use PhotoSwipe's correctZoomPan to animate snap-back to valid bounds
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const gestures = (pswp as any).gestures;
+    const { gestures } = pswp as any;
     if (gestures?.zoomLevels?.correctZoomPan) {
       gestures.zoomLevels.correctZoomPan(true);
     }
@@ -210,7 +209,7 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
           // Clear PhotoSwipe's internal tap timer to prevent
           // single-tap from firing when we eventually release
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const gestures = (pswp as any).gestures;
+          const { gestures } = pswp as any;
           if (gestures?._clearTapTimer) {
             gestures._clearTapTimer();
           }
