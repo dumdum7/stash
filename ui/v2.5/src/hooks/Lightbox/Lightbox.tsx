@@ -33,6 +33,7 @@ import * as GQL from "src/core/generated-graphql";
 import { useInterfaceLocalForage } from "../LocalForage";
 import { imageLightboxDisplayModeIntlMap } from "src/core/enums";
 import { ILightboxImage, IChapter } from "./types";
+import { setupDoubleTapDragZoom } from "./useDoubleTapDragZoom";
 import {
   faArrowLeft,
   faArrowRight,
@@ -366,7 +367,11 @@ export const LightboxComponent: React.FC<IProps> = ({
     pswpRef.current = pswp;
     pswpRef.current.prevIndex = startIndex;
 
+    // Attach double-tap-drag-to-zoom gesture (Google Photos style)
+    const cleanupDoubleTapDragZoom = setupDoubleTapDragZoom(pswp);
+
     return () => {
+      cleanupDoubleTapDragZoom();
       if (pswpRef.current) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pswpRef.current._transitioning = true;
