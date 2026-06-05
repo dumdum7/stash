@@ -319,7 +319,10 @@ export const LightboxComponent: React.FC<IProps> = ({
       },
     });
 
+    let wasZoomedIn = false;
+
     pswp.on("change", () => {
+      wasZoomedIn = false;
       if (isSwitchingPageRef.current) return;
 
       const newIndex = pswp.currIndex;
@@ -339,6 +342,17 @@ export const LightboxComponent: React.FC<IProps> = ({
       setIndex(actualIndex);
       if (pswpRef.current) {
         pswpRef.current.prevIndex = newIndex;
+      }
+    });
+
+    pswp.on("zoomPanUpdate", () => {
+      if (pswp.currSlide) {
+        const isZoomedIn =
+          pswp.currSlide.currZoomLevel > pswp.currSlide.zoomLevels.min * 1.05;
+        if (isZoomedIn && !wasZoomedIn) {
+          setShowControls(false);
+        }
+        wasZoomedIn = isZoomedIn;
       }
     });
 
