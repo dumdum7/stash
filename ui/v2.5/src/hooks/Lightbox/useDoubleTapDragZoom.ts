@@ -270,7 +270,9 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
 
       case "zooming":
         finishZoomGesture();
-        resetState(state);
+        // Delay reset so PhotoSwipe's pointerUp hook can read the "zooming" state
+        // and prevent the default tap action from firing.
+        setTimeout(() => resetState(state), 0);
         break;
 
       default:
@@ -284,8 +286,10 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
 
     if (state.phase === "zooming") {
       finishZoomGesture();
+      setTimeout(() => resetState(state), 0);
+    } else {
+      resetState(state);
     }
-    resetState(state);
   }
 
   // ─── PhotoSwipe Event Hooks ─────────────────────────────────────────
@@ -312,6 +316,14 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handlePswpTapAction(e: any) {
+    // Prevent controls from toggling if user holds second tap without dragging
+    if (state.phase === "secondTapDown" || state.phase === "zooming") {
+      e.preventDefault();
+    }
+  }
+
   // ─── Bind Events ──────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -332,6 +344,7 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
   pswp.on("pointerDown", handlePswpPointerDown);
   pswp.on("pointerMove", handlePswpPointerMove);
   pswp.on("pointerUp", handlePswpPointerUp);
+  pswp.on("tapAction", handlePswpTapAction);
 
   // ─── Cleanup ──────────────────────────────────────────────────────
 
@@ -356,5 +369,6 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
     pswp.off("pointerDown", handlePswpPointerDown);
     pswp.off("pointerMove", handlePswpPointerMove);
     pswp.off("pointerUp", handlePswpPointerUp);
+    pswp.off("tapAction", handlePswpTapAction);
   };
 }
