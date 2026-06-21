@@ -276,6 +276,7 @@ export const LightboxComponent: React.FC<IProps> = ({
             src: img.paths.image || "",
             width: img.visual_files?.[0]?.width || 1200,
             height: img.visual_files?.[0]?.height || 800,
+            autoSize: !img.visual_files?.[0]?.width,
             alt: img.title || "",
           };
         }
@@ -361,6 +362,27 @@ export const LightboxComponent: React.FC<IProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((pswp as any)._transitioning) return;
       closeRef.current();
+    });
+
+    pswp.on("contentLoad", (e: any) => {
+      const { content } = e;
+      if (content.data && content.data.autoSize) {
+        const img = new Image();
+        img.onload = () => {
+          content.data.width = img.naturalWidth;
+          content.data.height = img.naturalHeight;
+          content.data.w = img.naturalWidth;
+          content.data.h = img.naturalHeight;
+          content.data.autoSize = false;
+          if (pswpRef.current) {
+            pswpRef.current.refreshSlideContent(content.index);
+          }
+        };
+        img.onerror = () => {
+          content.data.autoSize = false;
+        };
+        img.src = content.data.src || "";
+      }
     });
 
     pswp.init();
