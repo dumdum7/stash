@@ -364,7 +364,7 @@ export const LightboxComponent: React.FC<IProps> = ({
       closeRef.current();
     });
 
-    interface ContentLoadEvent {
+    interface IContentLoadEvent {
       content: {
         index: number;
         data: {
@@ -378,7 +378,7 @@ export const LightboxComponent: React.FC<IProps> = ({
       };
     }
 
-    pswp.on("contentLoad", (e: ContentLoadEvent) => {
+    pswp.on("contentLoad", (e: IContentLoadEvent) => {
       const { content } = e;
       if (content.data && content.data.autoSize) {
         const img = new Image();
