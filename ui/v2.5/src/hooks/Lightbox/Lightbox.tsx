@@ -364,7 +364,21 @@ export const LightboxComponent: React.FC<IProps> = ({
       closeRef.current();
     });
 
-    pswp.on("contentLoad", (e: any) => {
+    interface ContentLoadEvent {
+      content: {
+        index: number;
+        data: {
+          src?: string;
+          width?: number;
+          height?: number;
+          w?: number;
+          h?: number;
+          autoSize?: boolean;
+        };
+      };
+    }
+
+    pswp.on("contentLoad", (e: ContentLoadEvent) => {
       const { content } = e;
       if (content.data && content.data.autoSize) {
         const img = new Image();
