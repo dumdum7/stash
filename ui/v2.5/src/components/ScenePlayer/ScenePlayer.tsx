@@ -821,10 +821,38 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
         player.on("loadedmetadata", handleLoadMetadata);
       }
 
+      // Heatmap setup
+      let heatmapEl: HTMLDivElement | null = null;
+      if (
+        scene.interactive &&
+        scene.interactive_speed &&
+        scene.paths.interactive_heatmap
+      ) {
+        const progressHolder = player
+          .el()
+          .querySelector(".vjs-progress-holder");
+        if (progressHolder) {
+          const existing = progressHolder.querySelector(
+            ".vjs-interactive-heatmap"
+          );
+          if (existing) {
+            existing.remove();
+          }
+
+          heatmapEl = document.createElement("div");
+          heatmapEl.className = "vjs-interactive-heatmap";
+          heatmapEl.style.backgroundImage = `url(${scene.paths.interactive_heatmap})`;
+          progressHolder.appendChild(heatmapEl);
+        }
+      }
+
       return () => {
         player.off("loadedmetadata", handleLoadMetadata);
         const markers = player!.markers();
         markers.clearMarkers();
+        if (heatmapEl) {
+          heatmapEl.remove();
+        }
       };
     }, [getPlayer, scene, loadMarkers]);
 
