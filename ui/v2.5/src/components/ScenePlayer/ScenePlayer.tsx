@@ -9,7 +9,6 @@ import React, {
 import videojs, { VideoJsPlayer, VideoJsPlayerOptions } from "video.js";
 import useScript from "src/hooks/useScript";
 import "videojs-contrib-dash";
-import "videojs-mobile-ui";
 import "videojs-seek-buttons";
 import { UAParser } from "ua-parser-js";
 import "./live";
@@ -298,6 +297,59 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       () => (scene.files.length > 0 ? scene.files[0] : undefined),
       [scene]
     );
+
+    const isLandscape = useMemo(
+      () => !!(file?.height && file?.width && file.width > file.height),
+      [file]
+    );
+
+    const isPortrait = useMemo(
+      () => !!(file?.height && file?.width && file.height > file.width),
+      [file]
+    );
+
+    // Fullscreen mobile auto-rotate
+    useEffect(() => {
+      const isSafari = UAParser().browser.name?.includes("Safari");
+      if (isSafari) return;
+
+      const disableAutoRotate =
+        uiConfig?.disableMobileMediaAutoRotateEnabled ?? false;
+
+      if (!fullscreen || disableAutoRotate) {
+        if (screen?.orientation?.unlock) {
+          try {
+            screen.orientation.unlock();
+          } catch (e) {}
+        }
+        return;
+      }
+
+      if (isLandscape) {
+        screen?.orientation?.lock?.("landscape").catch(() => {});
+      } else if (isPortrait) {
+        screen?.orientation?.lock?.("portrait").catch(() => {});
+      } else if (screen?.orientation?.unlock) {
+        try {
+          screen.orientation.unlock();
+        } catch (e) {}
+      }
+    }, [
+      fullscreen,
+      isLandscape,
+      isPortrait,
+      uiConfig?.disableMobileMediaAutoRotateEnabled,
+    ]);
+
+    useEffect(() => {
+      return () => {
+        if (screen?.orientation?.unlock) {
+          try {
+            screen.orientation.unlock();
+          } catch (e) {}
+        }
+      };
+    }, []);
 
     const maxLoopDuration = interfaceConfig?.maximumLoopDuration ?? 0;
     const looping = useMemo(
@@ -607,23 +659,6 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       interactiveClient.pause();
 
       const isSafari = UAParser().browser.name?.includes("Safari");
-      const isLandscape = file.height && file.width && file.width > file.height;
-      const mobileUiOptions = {
-        fullscreen: {
-          enterOnRotate: true,
-          exitOnRotate: true,
-          lockOnRotate: true,
-          lockToLandscapeOnEnter: uiConfig?.disableMobileMediaAutoRotateEnabled
-            ? false
-            : isLandscape,
-        },
-        touchControls: {
-          disabled: true,
-        },
-      };
-      if (!isSafari) {
-        player.mobileUi(mobileUiOptions);
-      }
 
       function isDirect(src: URL) {
         return (
@@ -743,7 +778,6 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       autoplay,
       interfaceConfig?.autostartVideo,
       uiConfig?.alwaysStartFromBeginning,
-      uiConfig?.disableMobileMediaAutoRotateEnabled,
       _initialTimestamp,
     ]);
 
@@ -1015,9 +1049,6 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
         }
       }
     }
-
-    const isPortrait =
-      file && file.height && file.width && file.height > file.width;
 
     return (
       <div
