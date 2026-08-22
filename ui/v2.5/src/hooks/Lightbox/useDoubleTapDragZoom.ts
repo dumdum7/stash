@@ -72,14 +72,24 @@ function getDistance(
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 }
 
+interface IDoubleTapDragZoomOptions {
+  onEdgeTapLeft?: () => void;
+  onEdgeTapRight?: () => void;
+  allowNavigation?: () => boolean;
+}
+
 /**
  * Attaches the double-tap-drag-to-zoom gesture to a PhotoSwipe instance.
  * Call this after `pswp.init()`.
  *
  * @returns A cleanup function to remove all listeners.
  */
-export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
+export function setupDoubleTapDragZoom(
+  pswp: PhotoSwipe,
+  options?: IDoubleTapDragZoomOptions
+): () => void {
   const state = createState();
+  let isEdgeTap = false;
 
   // ─── Zoom Helpers ─────────────────────────────────────────────────
 
@@ -149,8 +159,21 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
         state.activePointerId = e.pointerId;
         break;
 
-      case "waitSecondTap":
+      case "waitSecondTap": {
+        const screenWidth =
+          window.innerWidth ||
+          document.documentElement.clientWidth ||
+          document.body.clientWidth;
+        const isNavAllowed = options?.allowNavigation
+          ? options.allowNavigation()
+          : true;
+        const isEdge =
+          isNavAllowed &&
+          screenWidth > 0 &&
+          (pos.x < screenWidth * 0.2 || pos.x > screenWidth * 0.8);
+
         if (
+          !isEdge &&
           getDistance(pos, state.firstTapDownPos) < TAP_MAX_DISTANCE &&
           pswp.currSlide.isZoomable()
         ) {
@@ -169,13 +192,14 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
           // Stop any ongoing PhotoSwipe animations
           pswp.animations.stopAll();
         } else {
-          // Too far — treat as new first tap
+          // Too far or on edge — treat as new first tap
           resetState(state);
           state.phase = "firstTapDown";
           state.firstTapDownPos = { ...pos };
           state.activePointerId = e.pointerId;
         }
         break;
+      }
 
       default:
         // Multi-touch or unexpected state — abort
@@ -250,6 +274,38 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
       case "firstTapDown": {
         const pos = { x: e.clientX, y: e.clientY };
         if (getDistance(pos, state.firstTapDownPos) < TAP_MAX_DISTANCE) {
+          const screenWidth =
+            window.innerWidth ||
+            document.documentElement.clientWidth ||
+            document.body.clientWidth;
+          const isNavAllowed = options?.allowNavigation
+            ? options.allowNavigation()
+            : true;
+
+          if (isNavAllowed && screenWidth > 0) {
+            // Far left edge tap -> instant previous
+            if (
+              pos.x < screenWidth * 0.2 &&
+              state.firstTapDownPos.x < screenWidth * 0.2
+            ) {
+              isEdgeTap = true;
+              resetState(state);
+              options?.onEdgeTapLeft?.();
+              break;
+            }
+
+            // Far right edge tap -> instant next
+            if (
+              pos.x > screenWidth * 0.8 &&
+              state.firstTapDownPos.x > screenWidth * 0.8
+            ) {
+              isEdgeTap = true;
+              resetState(state);
+              options?.onEdgeTapRight?.();
+              break;
+            }
+          }
+
           state.phase = "waitSecondTap";
           state.firstTapUpTime = Date.now();
           state.activePointerId = null;
@@ -311,16 +367,27 @@ export function setupDoubleTapDragZoom(pswp: PhotoSwipe): () => void {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handlePswpPointerUp(e: any) {
-    if (state.phase === "zooming") {
+    if (state.phase === "zooming" || isEdgeTap) {
       e.preventDefault();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { gestures } = pswp as any;
+      if (gestures?._clearTapTimer) {
+        gestures._clearTapTimer();
+      }
+      isEdgeTap = false;
     }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handlePswpTapAction(e: any) {
-    // Prevent controls from toggling if user holds second tap without dragging
-    if (state.phase === "secondTapDown" || state.phase === "zooming") {
+    // Prevent controls from toggling if user holds second tap without dragging or edge tapped
+    if (
+      state.phase === "secondTapDown" ||
+      state.phase === "zooming" ||
+      isEdgeTap
+    ) {
       e.preventDefault();
+      isEdgeTap = false;
     }
   }
 

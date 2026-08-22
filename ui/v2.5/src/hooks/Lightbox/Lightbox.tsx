@@ -130,7 +130,7 @@ export const LightboxComponent: React.FC<IProps> = ({
   const clearIntervalCallback = useRef<() => void>();
   const resetIntervalCallback = useRef<() => void>();
 
-  const allowNavigation = images.length > 1 || pageCallback;
+  const allowNavigation = images.length > 1 || Boolean(pageCallback);
 
   const Toast = useToast();
   const intl = useIntl();
@@ -224,6 +224,7 @@ export const LightboxComponent: React.FC<IProps> = ({
   const handleLeftRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleRightRef = useRef<any>(null);
+  const allowNavigationRef = useRef<boolean>(allowNavigation);
   const isSwitchingPageRef = useRef<boolean>(isSwitchingPage);
   const pageChangeCountRef = useRef(0);
 
@@ -293,6 +294,33 @@ export const LightboxComponent: React.FC<IProps> = ({
     // Shift by 1 because of the leading blank slide
     startIndex = startIndex + 1;
 
+    const handleTap = (
+      point?: { x?: number; y?: number },
+      originalEvent?: PointerEvent
+    ) => {
+      const x = point?.x ?? originalEvent?.clientX;
+      const screenWidth =
+        window.innerWidth ||
+        document.documentElement.clientWidth ||
+        document.body.clientWidth;
+
+      if (x !== undefined && screenWidth > 0 && allowNavigationRef.current) {
+        // Far left: navigate to previous image
+        if (x < screenWidth * 0.2) {
+          handleLeftRef.current?.();
+          return;
+        }
+
+        // Far right: navigate to next image
+        if (x > screenWidth * 0.8) {
+          handleRightRef.current?.();
+          return;
+        }
+      }
+
+      setShowControls((prev) => !prev);
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const PhotoSwipeClass = (PhotoSwipe as any).default || PhotoSwipe;
     console.log("creating new photoswipe with index", startIndex);
@@ -308,17 +336,13 @@ export const LightboxComponent: React.FC<IProps> = ({
       showAnimationDuration: 0,
       hideAnimationDuration: 0,
       loop: false, // Disable loop mode so we can swipe past boundaries and trigger page changes
-      imageClickAction: ScreenUtils.isTouch()
-        ? () => {
+      imageClickAction: ScreenUtils.isTouch() ? handleTap : "zoom",
+      bgClickAction: ScreenUtils.isTouch()
+        ? handleTap
+        : () => {
             setShowControls((prev) => !prev);
-          }
-        : "zoom",
-      bgClickAction: () => {
-        setShowControls((prev) => !prev);
-      },
-      tapAction: () => {
-        setShowControls((prev) => !prev);
-      },
+          },
+      tapAction: handleTap,
     });
 
     let wasZoomedIn = false;
@@ -404,7 +428,11 @@ export const LightboxComponent: React.FC<IProps> = ({
     pswpRef.current.prevIndex = startIndex;
 
     // Attach double-tap-drag-to-zoom gesture (Google Photos style)
-    const cleanupDoubleTapDragZoom = setupDoubleTapDragZoom(pswp);
+    const cleanupDoubleTapDragZoom = setupDoubleTapDragZoom(pswp, {
+      onEdgeTapLeft: () => handleLeftRef.current?.(),
+      onEdgeTapRight: () => handleRightRef.current?.(),
+      allowNavigation: () => allowNavigationRef.current,
+    });
 
     return () => {
       cleanupDoubleTapDragZoom();
@@ -618,6 +646,7 @@ export const LightboxComponent: React.FC<IProps> = ({
   handleLeftRef.current = handleLeft;
   handleRightRef.current = handleRight;
   isSwitchingPageRef.current = isSwitchingPage;
+  allowNavigationRef.current = allowNavigation;
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
