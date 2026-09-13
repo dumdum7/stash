@@ -16,12 +16,14 @@ import { PatchComponent } from "src/patch";
 import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
 import { ScenePreview } from "./SceneCard";
 import { TruncatedText } from "../Shared/TruncatedText";
+import { SceneMarkerQueue } from "src/models/sceneMarkerQueue";
 
 interface ISceneMarkerCardProps {
   marker: GQL.SceneMarkerDataFragment;
   cardWidth?: number;
   previewHeight?: number;
   index?: number;
+  queue?: SceneMarkerQueue;
   compact?: boolean;
   selecting?: boolean;
   selected?: boolean | undefined;
@@ -176,7 +178,10 @@ export const SceneMarkerCard = PatchComponent(
     return (
       <GridCard
         className={`scene-marker-card ${zoomIndex()}`}
-        url={NavUtils.makeSceneMarkerUrl(props.marker)}
+        url={
+          props.queue?.makeLink(props.marker) ??
+          NavUtils.makeSceneMarkerUrl(props.marker)
+        }
         title={markerTitle(props.marker)}
         width={props.cardWidth}
         linkClassName="scene-marker-card-link"

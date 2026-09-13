@@ -18,6 +18,7 @@ import {
   useSceneUpdate,
   queryFindScenes,
   queryFindScenesByID,
+  queryFindSceneMarkers,
   useSceneIncrementPlayCount,
 } from "src/core/StashService";
 
@@ -28,6 +29,7 @@ import { Icon } from "src/components/Shared/Icon";
 import { Counter } from "src/components/Shared/Counter";
 import { useToast } from "src/hooks/Toast";
 import SceneQueue, { QueuedScene } from "src/models/sceneQueue";
+import { SceneMarkerQueue } from "src/models/sceneMarkerQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
@@ -776,6 +778,11 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
     () => SceneQueue.fromQueryParameters(queryParams),
     [queryParams]
   );
+  const markerQueue = useMemo(
+    () => SceneMarkerQueue.fromQueryParameters(queryParams),
+    [queryParams]
+  );
+  const currentMarkerID = queryParams.get("qm");
   const queryContinue = useMemo(() => {
     let cont = queryParams.get("continue");
     if (cont) {
@@ -786,6 +793,11 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
   }, [configuration?.interface.continuePlaylistDefault, queryParams]);
 
   const [queueScenes, setQueueScenes] = useState<QueuedScene[]>([]);
+  const [queueMarkers, setQueueMarkers] = useState<
+    GQL.SceneMarkerDataFragment[]
+  >([]);
+  const [markerQueueTotal, setMarkerQueueTotal] = useState(0);
+  const [markerQueueStart, setMarkerQueueStart] = useState(1);
 
   const [collapsed, setCollapsed] = useState(false);
   const [continuePlaylist, setContinuePlaylist] = useState(queryContinue);
@@ -813,6 +825,10 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
   const currentQueueIndex = useMemo(
     () => queueScenes.findIndex((s) => s.id === id),
     [queueScenes, id]
+  );
+  const currentMarkerQueueIndex = useMemo(
+    () => queueMarkers.findIndex((marker) => marker.id === currentMarkerID),
+    [queueMarkers, currentMarkerID]
   );
 
   function getSetTimestamp(fn: (value: number) => void) {
@@ -857,6 +873,18 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
       getQueueScenes(sceneQueue.sceneIDs);
     }
   }, [sceneQueue]);
+
+  async function getMarkerQueuePage(filter: ListFilterModel) {
+    const result = await queryFindSceneMarkers(filter);
+    const { scene_markers, count } = result.data.findSceneMarkers;
+    setQueueMarkers(scene_markers);
+    setMarkerQueueTotal(count);
+    setMarkerQueueStart((filter.currentPage - 1) * filter.itemsPerPage + 1);
+  }
+
+  useEffect(() => {
+    if (markerQueue.query) getMarkerQueuePage(markerQueue.query);
+  }, [markerQueue]);
 
   async function onQueueLessScenes() {
     if (!sceneQueue.query || queueStart <= 1) {
@@ -947,6 +975,49 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
     }
   }
 
+  function loadMarker(
+    marker: GQL.SceneMarkerDataFragment,
+    autoPlay?: boolean,
+    page?: number
+  ) {
+    history.replace(
+      markerQueue.makeLink(marker, {
+        autoPlay,
+        continue: continuePlaylist,
+        page,
+      })
+    );
+  }
+
+  async function markerQueueNext(autoPlay: boolean) {
+    if (!markerQueue.query || currentMarkerQueueIndex === -1) return;
+    if (currentMarkerQueueIndex < queueMarkers.length - 1) {
+      loadMarker(queueMarkers[currentMarkerQueueIndex + 1], autoPlay);
+      return;
+    }
+    if (markerQueueStart + queueMarkers.length - 1 >= markerQueueTotal) return;
+    const filter = markerQueue.query.clone();
+    filter.currentPage += 1;
+    const result = await queryFindSceneMarkers(filter);
+    const markers = result.data.findSceneMarkers.scene_markers;
+    if (markers.length) loadMarker(markers[0], autoPlay, filter.currentPage);
+  }
+
+  async function markerQueuePrevious(autoPlay: boolean) {
+    if (!markerQueue.query || currentMarkerQueueIndex === -1) return;
+    if (currentMarkerQueueIndex > 0) {
+      loadMarker(queueMarkers[currentMarkerQueueIndex - 1], autoPlay);
+      return;
+    }
+    if (markerQueueStart <= 1) return;
+    const filter = markerQueue.query.clone();
+    filter.currentPage -= 1;
+    const result = await queryFindSceneMarkers(filter);
+    const markers = result.data.findSceneMarkers.scene_markers;
+    if (markers.length)
+      loadMarker(markers[markers.length - 1], autoPlay, filter.currentPage);
+  }
+
   async function queueRandom(autoPlay: boolean) {
     if (sceneQueue.query) {
       const { query } = sceneQueue;
@@ -972,7 +1043,11 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
   function onComplete() {
     // load the next scene if we're continuing
     if (continuePlaylist) {
-      queueNext(true);
+      if (markerQueue.query) {
+        markerQueueNext(true);
+      } else {
+        queueNext(true);
+      }
     }
   }
 
@@ -1018,8 +1093,16 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
         queueScenes={queueScenes}
         queueStart={queueStart}
         onDelete={onDelete}
-        onQueueNext={() => queueNext(autoPlayOnSelected)}
-        onQueuePrevious={() => queuePrevious(autoPlayOnSelected)}
+        onQueueNext={() =>
+          markerQueue.query
+            ? markerQueueNext(autoPlayOnSelected)
+            : queueNext(autoPlayOnSelected)
+        }
+        onQueuePrevious={() =>
+          markerQueue.query
+            ? markerQueuePrevious(autoPlayOnSelected)
+            : queuePrevious(autoPlayOnSelected)
+        }
         onQueueRandom={() => queueRandom(autoPlayOnSelected)}
         onQueueSceneClicked={onQueueSceneClicked}
         continuePlaylist={continuePlaylist}
@@ -1040,8 +1123,12 @@ const SceneLoader: React.FC<RouteComponentProps<ISceneParams>> = ({
           initialTimestamp={initialTimestamp}
           sendSetTimestamp={getSetTimestamp}
           onComplete={onComplete}
-          onNext={() => queueNext(true)}
-          onPrevious={() => queuePrevious(true)}
+          onNext={() =>
+            markerQueue.query ? markerQueueNext(true) : queueNext(true)
+          }
+          onPrevious={() =>
+            markerQueue.query ? markerQueuePrevious(true) : queuePrevious(true)
+          }
         />
       </div>
     </div>

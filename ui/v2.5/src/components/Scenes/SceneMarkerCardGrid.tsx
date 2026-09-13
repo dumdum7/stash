@@ -6,12 +6,14 @@ import {
   useContainerDimensions,
 } from "../Shared/GridCard/GridCard";
 import { PatchComponent } from "src/patch";
+import { SceneMarkerQueue } from "src/models/sceneMarkerQueue";
 
 interface ISceneMarkerCardGrid {
   markers: GQL.SceneMarkerDataFragment[];
   selectedIds: Set<string>;
   zoomIndex: number;
   onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
+  queue?: SceneMarkerQueue;
 }
 
 const zoomWidths = [240, 340, 480, 640];
@@ -19,7 +21,7 @@ const zoomWidths = [240, 340, 480, 640];
 export const SceneMarkerCardGrid: React.FC<ISceneMarkerCardGrid> =
   PatchComponent(
     "SceneMarkerCardGrid",
-    ({ markers, selectedIds, zoomIndex, onSelectChange }) => {
+    ({ markers, selectedIds, zoomIndex, onSelectChange, queue }) => {
       const [componentRef, { width: containerWidth }] =
         useContainerDimensions();
       const cardWidth = useCardWidth(containerWidth, zoomIndex, zoomWidths);
@@ -31,6 +33,7 @@ export const SceneMarkerCardGrid: React.FC<ISceneMarkerCardGrid> =
               key={marker.id}
               cardWidth={cardWidth}
               marker={marker}
+              queue={queue}
               index={index}
               zoomIndex={zoomIndex}
               selecting={selectedIds.size > 0}

@@ -15,6 +15,7 @@ import { useDragMoveSelect } from "../Shared/GridCard/dragMoveSelect";
 import cx from "classnames";
 import NavUtils from "src/utils/navigation";
 import { markerTitle } from "src/core/markers";
+import { SceneMarkerQueue } from "src/models/sceneMarkerQueue";
 
 function wallItemTitle(sceneMarker: GQL.SceneMarkerDataFragment) {
   const newTitle = markerTitle(sceneMarker);
@@ -40,6 +41,7 @@ interface IExtraProps {
   selected?: boolean;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   selecting?: boolean;
+  queue?: SceneMarkerQueue;
 }
 
 export const MarkerWallItem: React.FC<
@@ -161,6 +163,7 @@ interface IMarkerWallProps {
   selectedIds?: Set<string>;
   onSelectChange?: (id: string, selected: boolean, shiftKey: boolean) => void;
   selecting?: boolean;
+  queue?: SceneMarkerQueue;
 }
 
 // HACK: typescript doesn't allow Gallery to accept a parameter for some reason
@@ -206,6 +209,7 @@ const MarkerWall: React.FC<IMarkerWallProps> = ({
   selectedIds,
   onSelectChange,
   selecting,
+  queue,
 }) => {
   const history = useHistory();
 
@@ -231,7 +235,7 @@ const MarkerWall: React.FC<IMarkerWallProps> = ({
       return {
         marker: m,
         src: getFirstValidSrc([m.stream, m.preview, m.screenshot], erroredImgs),
-        link: NavUtils.makeSceneMarkerUrl(m),
+        link: queue?.makeLink(m) ?? NavUtils.makeSceneMarkerUrl(m),
         width,
         height,
         tabIndex: index,
@@ -241,7 +245,7 @@ const MarkerWall: React.FC<IMarkerWallProps> = ({
         onError: handleError,
       };
     });
-  }, [markers, erroredImgs, handleError]);
+  }, [markers, erroredImgs, handleError, queue]);
 
   const onClick = useCallback(
     (event, { index }) => {
@@ -320,6 +324,7 @@ interface IMarkerWallPanelProps {
   zoomIndex: number;
   selectedIds?: Set<string>;
   onSelectChange?: (id: string, selected: boolean, shiftKey: boolean) => void;
+  queue?: SceneMarkerQueue;
 }
 
 export const MarkerWallPanel: React.FC<IMarkerWallPanelProps> = ({
@@ -327,6 +332,7 @@ export const MarkerWallPanel: React.FC<IMarkerWallPanelProps> = ({
   zoomIndex,
   selectedIds,
   onSelectChange,
+  queue,
 }) => {
   const selecting = !!selectedIds && selectedIds.size > 0;
   return (
@@ -336,6 +342,7 @@ export const MarkerWallPanel: React.FC<IMarkerWallPanelProps> = ({
       selectedIds={selectedIds}
       onSelectChange={onSelectChange}
       selecting={selecting}
+      queue={queue}
     />
   );
 };

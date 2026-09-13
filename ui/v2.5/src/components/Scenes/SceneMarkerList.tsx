@@ -47,6 +47,7 @@ import useFocus from "src/utils/focus";
 import { SidebarPerformersFilter } from "../List/Filters/PerformersFilter";
 import { SidebarTagsFilter } from "../List/Filters/TagsFilter";
 import { Button } from "react-bootstrap";
+import { SceneMarkerQueue } from "src/models/sceneMarkerQueue";
 
 const SceneMarkerList: React.FC<{
   markers: GQL.SceneMarkerDataFragment[];
@@ -56,6 +57,10 @@ const SceneMarkerList: React.FC<{
 }> = PatchComponent(
   "SceneMarkerList",
   ({ markers, filter, selectedIds, onSelectChange }) => {
+    const queue = React.useMemo(
+      () => SceneMarkerQueue.fromListFilterModel(filter),
+      [filter]
+    );
     if (markers.length === 0) {
       return null;
     }
@@ -67,6 +72,7 @@ const SceneMarkerList: React.FC<{
           zoomIndex={filter.zoomIndex}
           selectedIds={selectedIds}
           onSelectChange={onSelectChange}
+          queue={queue}
         />
       );
     }
@@ -78,6 +84,7 @@ const SceneMarkerList: React.FC<{
           zoomIndex={filter.zoomIndex}
           selectedIds={selectedIds}
           onSelectChange={onSelectChange}
+          queue={queue}
         />
       );
     }
