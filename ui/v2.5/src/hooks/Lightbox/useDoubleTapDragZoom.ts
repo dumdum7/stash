@@ -97,32 +97,33 @@ export function setupDoubleTapDragZoom(
    * Apply a zoom level centered on the given anchor point.
    * Mirrors PhotoSwipe's ZoomHandler.change() approach:
    * adjusts pan so that the zoom appears to originate from the anchor.
+   *
+   * Like Google Photos, the zoom is clamped between fit and max, and the
+   * pan is kept within the image bounds throughout the gesture (the image
+   * is centered along an axis once it is smaller than the viewport). This
+   * means there is nothing to snap back when the finger is released.
    */
   function applyZoomAtPoint(newZoom: number, anchorX: number, anchorY: number) {
     if (!pswp?.currSlide) return;
 
     const slide = pswp.currSlide;
-    const { zoomLevels } = slide;
-
-    // Apply friction beyond bounds (same constants PhotoSwipe uses)
-    // We use fit as the minimum to prevent shrinking smaller than the screen
-    const { fit: min, max } = zoomLevels;
-    if (newZoom < min) {
-      newZoom = min - (min - newZoom) * 0.15;
-      // Hard cap the rubber band so it never gets absurdly small (max 25% smaller than fit)
-      newZoom = Math.max(min * 0.75, newZoom);
-    } else if (newZoom > max) {
-      newZoom = max + (newZoom - max) * 0.05;
-    }
+    const { fit, max } = slide.zoomLevels;
+    newZoom = Math.min(
+      Math.max(newZoom, Math.min(fit, state.startZoomLevel)),
+      max
+    );
 
     // Calculate pan position to keep the anchor point stationary.
+    // This is derived from the gesture start state on every move, so
+    // clamping the pan doesn't accumulate drift.
     const zoomFactor = newZoom / state.startZoomLevel;
     const panX = anchorX - (anchorX - state.startPanX) * zoomFactor;
     const panY = anchorY - (anchorY - state.startPanY) * zoomFactor;
 
+    // setZoomLevel recalculates the pan bounds for the new zoom level
     slide.setZoomLevel(newZoom);
-    slide.pan.x = panX;
-    slide.pan.y = panY;
+    slide.pan.x = slide.bounds.correctPan("x", panX);
+    slide.pan.y = slide.bounds.correctPan("y", panY);
     slide.applyCurrentZoomPan();
   }
 
