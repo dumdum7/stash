@@ -55,6 +55,7 @@ import { PatchFunction } from "./patch";
 import moment from "moment/min/moment-with-locales";
 import { ErrorMessage } from "./components/Shared/ErrorMessage";
 import cx from "classnames";
+import { useScrollRestoration } from "./hooks/scrollRestoration";
 
 const Performers = lazyComponent(
   () => import("./components/Performers/Performers")
@@ -204,6 +205,8 @@ export const App: React.FC = () => {
   const location = useLocation();
   const history = useHistory();
   const setupMatch = useRouteMatch(["/setup", "/migrate"]);
+
+  useScrollRestoration();
 
   // dispatch event when location changes
   useEffect(() => {
