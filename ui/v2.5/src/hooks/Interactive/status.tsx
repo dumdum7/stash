@@ -9,9 +9,13 @@ import {
 } from "./context";
 
 export const SceneInteractiveStatus: React.FC = ({}) => {
-  const { state, error } = React.useContext(InteractiveContext);
+  const { state, error, devicePaused } = React.useContext(InteractiveContext);
 
   function getStateClass() {
+    if (state === ConnectionState.Ready && devicePaused) {
+      return "interactive-status-paused";
+    }
+
     switch (state) {
       case ConnectionState.Connecting:
         return "interactive-status-connecting";
@@ -38,7 +42,11 @@ export const SceneInteractiveStatus: React.FC = ({}) => {
     <div className={`scene-interactive-status ${getStateClass()}`}>
       <FontAwesomeIcon pulse icon={faCircle} size="xs" />
       <span className="status-text">
-        <FormattedMessage id={connectionStateLabel(state)} />
+        {state === ConnectionState.Ready && devicePaused ? (
+          <FormattedMessage id="handy_connection_status.paused" />
+        ) : (
+          <FormattedMessage id={connectionStateLabel(state)} />
+        )}
         {error && <span>: {error}</span>}
       </span>
     </div>

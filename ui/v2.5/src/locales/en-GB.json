@@ -1232,6 +1232,7 @@
     "disconnected": "Disconnected",
     "error": "Error connecting to Handy",
     "missing": "Missing",
+    "paused": "Paused",
     "ready": "Ready",
     "syncing": "Syncing with server",
     "uploading": "Uploading script"

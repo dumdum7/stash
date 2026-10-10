@@ -16,6 +16,7 @@ import "./PlaylistButtons";
 import "./source-selector";
 import "./persist-volume";
 import "./autostart-button";
+import "./interactive-button";
 import MarkersPlugin, { type IMarker } from "./markers";
 void MarkersPlugin;
 import "./vtt-thumbnails";
@@ -276,6 +277,8 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       currentScript,
       initialised: interactiveInitialised,
       state: interactiveState,
+      devicePaused,
+      setDevicePaused,
     } = React.useContext(InteractiveContext);
 
     const [fullscreen, setFullscreen] = useState(false);
@@ -284,6 +287,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
     const started = useRef(false);
     const auto = useRef(false);
     const interactiveReady = useRef(false);
+    const devicePausedRef = useRef(devicePaused);
     const minimumPlayPercent = uiConfig?.minimumPlayPercent ?? 0;
     const trackActivity = uiConfig?.trackActivity ?? true;
     const vrTag = uiConfig?.vrTag ?? undefined;
@@ -459,6 +463,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
           skipButtons: {},
           trackActivity: {},
           vrMenu: {},
+          interactiveButton: {},
           autostartButton: {
             enabled: interfaceConfig?.autostartVideo ?? false,
           },
@@ -537,10 +542,46 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
     // play the script if video started before script upload finished
     useEffect(() => {
       if (interactiveState !== ConnectionState.Ready) return;
+      if (devicePausedRef.current) return;
       const player = getPlayer();
       if (!player || player.paused()) return;
       interactiveClient.ensurePlaying(player.currentTime());
     }, [interactiveState, getPlayer, interactiveClient]);
+
+    // stop or resume the device when it is paused/unpaused by the user
+    useEffect(() => {
+      if (devicePausedRef.current === devicePaused) return;
+      devicePausedRef.current = devicePaused;
+
+      if (devicePaused) {
+        interactiveClient.pause();
+        return;
+      }
+
+      const player = getPlayer();
+      if (!player || player.paused()) return;
+      if (scene.interactive && interactiveReady.current) {
+        interactiveClient.play(player.currentTime());
+      }
+    }, [devicePaused, getPlayer, interactiveClient, scene.interactive]);
+
+    useEffect(() => {
+      const player = getPlayer();
+      if (!player) return;
+
+      const interactiveButton = player.interactiveButton();
+      interactiveButton.setShowButton(
+        scene.interactive && interactiveState !== ConnectionState.Missing
+      );
+      interactiveButton.setPaused(devicePaused);
+      interactiveButton.onToggle = () => setDevicePaused(!devicePaused);
+    }, [
+      getPlayer,
+      scene.interactive,
+      interactiveState,
+      devicePaused,
+      setDevicePaused,
+    ]);
 
     useEffect(() => {
       const player = getPlayer();
@@ -609,12 +650,16 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       if (!player) return;
 
       function playing(this: VideoJsPlayer) {
-        if (scene.interactive && interactiveReady.current) {
+        if (
+          scene.interactive &&
+          interactiveReady.current &&
+          !devicePausedRef.current
+        ) {
           interactiveClient.play(this.currentTime());
           // trigger a second script play event to adjust for video player issues
           clearTimeout(playingTimer.current);
           playingTimer.current = setTimeout(() => {
-            if (this.paused()) return;
+            if (this.paused() || devicePausedRef.current) return;
             interactiveClient.play(this.currentTime());
           }, DELAY_FOR_SECOND_PLAY_MS);
         }
@@ -1061,6 +1106,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
         <div className="video-wrapper" ref={videoRef} />
         {scene.interactive &&
           (interactiveState !== ConnectionState.Ready ||
+            devicePaused ||
             getPlayer()?.paused()) && <SceneInteractiveStatus />}
         {file && showScrubber && (
           <ScenePlayerScrubber

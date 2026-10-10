@@ -44,6 +44,9 @@ export interface IState {
   initialised: boolean;
   currentScript?: string;
   error?: string;
+  // when true, no playback commands are sent to the device
+  devicePaused: boolean;
+  setDevicePaused: (paused: boolean) => void;
   initialise: () => Promise<void>;
   uploadScript: (funscriptPath: string) => Promise<void>;
   sync: () => Promise<void>;
@@ -54,6 +57,8 @@ export const InteractiveContext = React.createContext<IState>({
   state: ConnectionState.Missing,
   serverOffset: 0,
   initialised: false,
+  devicePaused: false,
+  setDevicePaused: () => {},
   initialise: () => {
     return Promise.resolve();
   },
@@ -115,6 +120,7 @@ export const InteractiveProvider: React.FC = ({ children }) => {
 
   const [initialised, setInitialised] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [devicePaused, setDevicePaused] = useState(false);
 
   const initialise = useCallback(async () => {
     setError(undefined);
@@ -236,6 +242,8 @@ export const InteractiveProvider: React.FC = ({ children }) => {
         currentScript,
         serverOffset: config?.serverOffset ?? 0,
         initialised,
+        devicePaused,
+        setDevicePaused,
         initialise,
         uploadScript,
         sync,

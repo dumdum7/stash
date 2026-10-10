@@ -155,6 +155,44 @@ $sceneTabWidth: 450px;
     }
   }
 
+  .vjs-interactive-button {
+    cursor: pointer;
+
+    .vjs-icon-placeholder {
+      align-items: center;
+      display: inline-flex;
+      height: 100%;
+      justify-content: center;
+      position: relative;
+      width: 100%;
+
+      svg {
+        height: 1.4em;
+        width: 1.4em;
+      }
+    }
+
+    &.vjs-interactive-paused .vjs-icon-placeholder {
+      color: $danger;
+
+      // diagonal strike-through to indicate the device is paused
+      &::after {
+        background-color: currentColor;
+        content: "";
+        height: 2px;
+        left: 50%;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        width: 1.8em;
+      }
+    }
+
+    &:hover {
+      text-shadow: 0 0 1em rgba(255, 255, 255, 0.75);
+    }
+  }
+
   .vjs-control-bar {
     background: none;
 

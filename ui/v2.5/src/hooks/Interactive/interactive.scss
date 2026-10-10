@@ -19,6 +19,10 @@ div.scene-interactive-status {
     color: $success;
   }
 
+  &.interactive-status-paused svg {
+    color: $secondary;
+  }
+
   .status-text {
     margin-left: 0.5rem;
   }
