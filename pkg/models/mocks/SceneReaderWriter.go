@@ -710,6 +710,29 @@ func (_m *SceneReaderWriter) FindMany(ctx context.Context, ids []int) ([]*models
 	return r0, r1
 }
 
+// GetAllODates provides a mock function with given fields: ctx, start, end
+func (_m *SceneReaderWriter) GetAllODates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error) {
+	ret := _m.Called(ctx, start, end)
+
+	var r0 []time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) []time.Time); ok {
+		r0 = rf(ctx, start, end)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *time.Time, *time.Time) error); ok {
+		r1 = rf(ctx, start, end)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAllOCount provides a mock function with given fields: ctx
 func (_m *SceneReaderWriter) GetAllOCount(ctx context.Context) (int, error) {
 	ret := _m.Called(ctx)
@@ -724,6 +747,29 @@ func (_m *SceneReaderWriter) GetAllOCount(ctx context.Context) (int, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAllViewDates provides a mock function with given fields: ctx, start, end
+func (_m *SceneReaderWriter) GetAllViewDates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error) {
+	ret := _m.Called(ctx, start, end)
+
+	var r0 []time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) []time.Time); ok {
+		r0 = rf(ctx, start, end)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *time.Time, *time.Time) error); ok {
+		r1 = rf(ctx, start, end)
 	} else {
 		r1 = ret.Error(1)
 	}

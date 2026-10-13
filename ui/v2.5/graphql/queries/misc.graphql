@@ -46,3 +46,10 @@ query LatestVersion {
     url
   }
 }
+
+query SceneActivityHistory($start: Timestamp, $end: Timestamp) {
+  sceneActivityHistory(start: $start, end: $end) {
+    play_dates
+    o_dates
+  }
+}

@@ -1021,6 +1021,36 @@ func (t *viewHistoryTable) getManyCount(ctx context.Context, ids []int) ([]int, 
 	return ret, nil
 }
 
+// getAllDates returns all dates in the table within the optional range, in ascending order.
+func (t *viewHistoryTable) getAllDates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error) {
+	table := t.table.table
+
+	// use datetime to normalise any stored timezone offsets before comparing
+	q := dialect.Select(t.dateColumn).From(table).Order(goqu.L("datetime(?)", t.dateColumn).Asc())
+
+	if start != nil {
+		q = q.Where(goqu.L("datetime(?) >= datetime(?)", t.dateColumn, UTCTimestamp{Timestamp{*start}}))
+	}
+	if end != nil {
+		q = q.Where(goqu.L("datetime(?) < datetime(?)", t.dateColumn, UTCTimestamp{Timestamp{*end}}))
+	}
+
+	const single = false
+	ret := []time.Time{}
+	if err := queryFunc(ctx, q, single, func(rows *sqlx.Rows) error {
+		var date Timestamp
+		if err := rows.Scan(&date); err != nil {
+			return err
+		}
+		ret = append(ret, date.Timestamp)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
 func (t *viewHistoryTable) getAllCount(ctx context.Context) (int, error) {
 	table := t.table.table
 	q := dialect.Select(goqu.COUNT("*")).From(table)

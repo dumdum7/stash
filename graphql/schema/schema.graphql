@@ -138,6 +138,8 @@ type Query {
   markerStrings(q: String, sort: String): [MarkerStringsResultType]!
   "Get stats"
   stats: StatsResultType!
+  "Get scene play and O history within an optional time range. End is exclusive."
+  sceneActivityHistory(start: Timestamp, end: Timestamp): SceneActivityHistory!
   "Organize scene markers by tag for a given scene ID"
   sceneMarkerTags(scene_id: ID!): [SceneMarkerTag!]!
 

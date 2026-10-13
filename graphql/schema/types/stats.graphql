@@ -15,3 +15,10 @@ type StatsResultType {
   total_play_count: Int!
   scenes_played: Int!
 }
+
+type SceneActivityHistory {
+  "Times at which scenes were played, in ascending order"
+  play_dates: [Time!]!
+  "Times at which O-counts were recorded for scenes, in ascending order"
+  o_dates: [Time!]!
+}

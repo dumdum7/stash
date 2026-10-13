@@ -29,6 +29,10 @@ func (qb *viewDateManager) CountAllViews(ctx context.Context) (int, error) {
 	return qb.tableMgr.getAllCount(ctx)
 }
 
+func (qb *viewDateManager) GetAllViewDates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error) {
+	return qb.tableMgr.getAllDates(ctx, start, end)
+}
+
 func (qb *viewDateManager) CountUniqueViews(ctx context.Context) (int, error) {
 	return qb.tableMgr.getUniqueCount(ctx)
 }
@@ -76,6 +80,10 @@ func (qb *oDateManager) GetManyOCount(ctx context.Context, ids []int) ([]int, er
 
 func (qb *oDateManager) GetAllOCount(ctx context.Context) (int, error) {
 	return qb.tableMgr.getAllCount(ctx)
+}
+
+func (qb *oDateManager) GetAllODates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error) {
+	return qb.tableMgr.getAllDates(ctx, start, end)
 }
 
 func (qb *oDateManager) GetUniqueOCount(ctx context.Context) (int, error) {

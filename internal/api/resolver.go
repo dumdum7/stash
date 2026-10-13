@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stashapp/stash/internal/build"
@@ -14,6 +15,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/scraper"
+	"github.com/stashapp/stash/pkg/sliceutil"
 )
 
 var (
@@ -292,6 +294,31 @@ func (r *queryResolver) Stats(ctx context.Context) (*StatsResultType, error) {
 			ScenesPlayed:      uniqueScenePlayCount,
 		}
 
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &ret, nil
+}
+
+func (r *queryResolver) SceneActivityHistory(ctx context.Context, start *time.Time, end *time.Time) (*SceneActivityHistory, error) {
+	var ret SceneActivityHistory
+	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+		qb := r.repository.Scene
+
+		playDates, err := qb.GetAllViewDates(ctx, start, end)
+		if err != nil {
+			return err
+		}
+
+		oDates, err := qb.GetAllODates(ctx, start, end)
+		if err != nil {
+			return err
+		}
+
+		ret.PlayDates = sliceutil.ValuesToPtrs(playDates)
+		ret.ODates = sliceutil.ValuesToPtrs(oDates)
 		return nil
 	}); err != nil {
 		return nil, err

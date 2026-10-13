@@ -1565,7 +1565,33 @@
     "total_o_count": "Total O-Count",
     "total_o_count_sfw": "Total Likes",
     "total_play_count": "Total Play Count",
-    "total_play_duration": "Total Play Duration"
+    "total_play_duration": "Total Play Duration",
+    "history": {
+      "group": {
+        "day": "Day",
+        "month": "Month",
+        "week": "Week"
+      },
+      "invalid_range": "Invalid date range",
+      "no_activity": "No activity in this range",
+      "o_history": "O-Count History",
+      "o_history_sfw": "Likes History",
+      "per_day": "per day",
+      "per_month": "per month",
+      "per_week": "per week",
+      "play_history": "Play History",
+      "plays": "{count, plural, one {# play} other {# plays}}",
+      "range": {
+        "1y": "1Y",
+        "30d": "30D",
+        "7d": "7D",
+        "90d": "90D",
+        "all": "All",
+        "custom": "Custom"
+      },
+      "show_table": "Show table",
+      "week_of": "Week of {date}"
+    }
   },
   "status": "Status: {statusText}",
   "studio": "Studio",

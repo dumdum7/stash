@@ -78,6 +78,8 @@ type ViewDateReader interface {
 	GetViewDates(ctx context.Context, relatedID int) ([]time.Time, error)
 	GetManyViewDates(ctx context.Context, ids []int) ([][]time.Time, error)
 	GetManyLastViewed(ctx context.Context, ids []int) ([]*time.Time, error)
+	// GetAllViewDates returns the view dates of all scenes within the optional range, in ascending order.
+	GetAllViewDates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error)
 }
 
 type ODateReader interface {
@@ -86,6 +88,8 @@ type ODateReader interface {
 	GetAllOCount(ctx context.Context) (int, error)
 	GetODates(ctx context.Context, relatedID int) ([]time.Time, error)
 	GetManyODates(ctx context.Context, ids []int) ([][]time.Time, error)
+	// GetAllODates returns the O dates of all scenes within the optional range, in ascending order.
+	GetAllODates(ctx context.Context, start *time.Time, end *time.Time) ([]time.Time, error)
 }
 
 // SceneReader provides all methods to read scenes.
