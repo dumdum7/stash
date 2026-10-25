@@ -18,6 +18,7 @@ import type PhotoSwipe from "photoswipe";
 const DOUBLE_TAP_DELAY = 300; // ms — max interval between first tap-up and second tap-down
 const TAP_MAX_DISTANCE = 25; // px — max movement allowed during first tap
 const DRAG_ACTIVATE_DISTANCE = 5; // px — min vertical drag before zoom starts
+const EDGE_HOLD_DELAY = 400; // ms — how long an edge press must be held to start auto-advancing
 
 // Zoom sensitivity: how much zoom change per pixel of vertical drag.
 // Dragging down (positive deltaY) zooms in, dragging up zooms out.
@@ -39,6 +40,7 @@ interface IDoubleTapDragState {
   startPanX: number;
   startPanY: number;
   waitTimer: ReturnType<typeof setTimeout> | null;
+  holdTimer: ReturnType<typeof setTimeout> | null;
   activePointerId: number | null;
 }
 
@@ -52,6 +54,7 @@ function createState(): IDoubleTapDragState {
     startPanX: 0,
     startPanY: 0,
     waitTimer: null,
+    holdTimer: null,
     activePointerId: null,
   };
 }
@@ -62,6 +65,10 @@ function resetState(state: IDoubleTapDragState) {
   if (state.waitTimer) {
     clearTimeout(state.waitTimer);
     state.waitTimer = null;
+  }
+  if (state.holdTimer) {
+    clearTimeout(state.holdTimer);
+    state.holdTimer = null;
   }
 }
 
@@ -75,6 +82,9 @@ function getDistance(
 interface IDoubleTapDragZoomOptions {
   onEdgeTapLeft?: () => void;
   onEdgeTapRight?: () => void;
+  // Called when an edge region is pressed and held, and again when released
+  onEdgeHoldStart?: (side: "left" | "right") => void;
+  onEdgeHoldEnd?: () => void;
   allowNavigation?: () => boolean;
 }
 
@@ -90,6 +100,50 @@ export function setupDoubleTapDragZoom(
 ): () => void {
   const state = createState();
   let isEdgeTap = false;
+  let isEdgeHolding = false;
+
+  function getEdge(x: number): "left" | "right" | null {
+    const screenWidth =
+      window.innerWidth ||
+      document.documentElement.clientWidth ||
+      document.body.clientWidth;
+    const isNavAllowed = options?.allowNavigation
+      ? options.allowNavigation()
+      : true;
+    if (!isNavAllowed || screenWidth <= 0) return null;
+    if (x < screenWidth * 0.2) return "left";
+    if (x > screenWidth * 0.8) return "right";
+    return null;
+  }
+
+  // ─── Edge Hold Helpers ────────────────────────────────────────────
+
+  function startFirstTap(e: PointerEvent, pos: { x: number; y: number }) {
+    state.phase = "firstTapDown";
+    state.firstTapDownPos = { ...pos };
+    state.activePointerId = e.pointerId;
+
+    const side = getEdge(pos.x);
+    if (side && options?.onEdgeHoldStart) {
+      state.holdTimer = setTimeout(() => {
+        state.holdTimer = null;
+        if (state.phase !== "firstTapDown") return;
+        isEdgeHolding = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { gestures } = pswp as any;
+        if (gestures?._clearTapTimer) {
+          gestures._clearTapTimer();
+        }
+        options.onEdgeHoldStart?.(side);
+      }, EDGE_HOLD_DELAY);
+    }
+  }
+
+  function endEdgeHold() {
+    if (!isEdgeHolding) return;
+    isEdgeHolding = false;
+    options?.onEdgeHoldEnd?.();
+  }
 
   // ─── Zoom Helpers ─────────────────────────────────────────────────
 
@@ -155,23 +209,11 @@ export function setupDoubleTapDragZoom(
 
     switch (state.phase) {
       case "idle":
-        state.phase = "firstTapDown";
-        state.firstTapDownPos = { ...pos };
-        state.activePointerId = e.pointerId;
+        startFirstTap(e, pos);
         break;
 
       case "waitSecondTap": {
-        const screenWidth =
-          window.innerWidth ||
-          document.documentElement.clientWidth ||
-          document.body.clientWidth;
-        const isNavAllowed = options?.allowNavigation
-          ? options.allowNavigation()
-          : true;
-        const isEdge =
-          isNavAllowed &&
-          screenWidth > 0 &&
-          (pos.x < screenWidth * 0.2 || pos.x > screenWidth * 0.8);
+        const isEdge = getEdge(pos.x) !== null;
 
         if (
           !isEdge &&
@@ -195,9 +237,7 @@ export function setupDoubleTapDragZoom(
         } else {
           // Too far or on edge — treat as new first tap
           resetState(state);
-          state.phase = "firstTapDown";
-          state.firstTapDownPos = { ...pos };
-          state.activePointerId = e.pointerId;
+          startFirstTap(e, pos);
         }
         break;
       }
@@ -207,6 +247,7 @@ export function setupDoubleTapDragZoom(
         if (state.phase === "zooming") {
           finishZoomGesture();
         }
+        endEdgeHold();
         resetState(state);
         break;
     }
@@ -218,6 +259,9 @@ export function setupDoubleTapDragZoom(
     if (!pswp?.currSlide) return;
 
     const pos = { x: e.clientX, y: e.clientY };
+
+    // Moving the finger while holding doesn't cancel the hold
+    if (isEdgeHolding) return;
 
     switch (state.phase) {
       case "firstTapDown":
@@ -271,40 +315,29 @@ export function setupDoubleTapDragZoom(
     if (e.pointerType !== "touch") return;
     if (e.pointerId !== state.activePointerId) return;
 
+    if (isEdgeHolding) {
+      // Suppress PhotoSwipe's tap handling for the release of the hold
+      isEdgeTap = true;
+      endEdgeHold();
+      resetState(state);
+      return;
+    }
+
     switch (state.phase) {
       case "firstTapDown": {
         const pos = { x: e.clientX, y: e.clientY };
         if (getDistance(pos, state.firstTapDownPos) < TAP_MAX_DISTANCE) {
-          const screenWidth =
-            window.innerWidth ||
-            document.documentElement.clientWidth ||
-            document.body.clientWidth;
-          const isNavAllowed = options?.allowNavigation
-            ? options.allowNavigation()
-            : true;
-
-          if (isNavAllowed && screenWidth > 0) {
-            // Far left edge tap -> instant previous
-            if (
-              pos.x < screenWidth * 0.2 &&
-              state.firstTapDownPos.x < screenWidth * 0.2
-            ) {
-              isEdgeTap = true;
-              resetState(state);
+          const side = getEdge(pos.x);
+          if (side && side === getEdge(state.firstTapDownPos.x)) {
+            isEdgeTap = true;
+            resetState(state);
+            // Far left edge tap -> instant previous, far right -> instant next
+            if (side === "left") {
               options?.onEdgeTapLeft?.();
-              break;
-            }
-
-            // Far right edge tap -> instant next
-            if (
-              pos.x > screenWidth * 0.8 &&
-              state.firstTapDownPos.x > screenWidth * 0.8
-            ) {
-              isEdgeTap = true;
-              resetState(state);
+            } else {
               options?.onEdgeTapRight?.();
-              break;
             }
+            break;
           }
 
           state.phase = "waitSecondTap";
@@ -341,6 +374,7 @@ export function setupDoubleTapDragZoom(
   function handlePointerCancel(e: PointerEvent) {
     if (e.pointerId !== state.activePointerId) return;
 
+    endEdgeHold();
     if (state.phase === "zooming") {
       finishZoomGesture();
       setTimeout(() => resetState(state), 0);
@@ -361,7 +395,7 @@ export function setupDoubleTapDragZoom(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handlePswpPointerMove(e: any) {
-    if (state.phase === "zooming") {
+    if (state.phase === "zooming" || isEdgeHolding) {
       e.preventDefault();
     }
   }
@@ -392,6 +426,13 @@ export function setupDoubleTapDragZoom(
     }
   }
 
+  function handleContextMenu(e: Event) {
+    // Long-pressing an edge shouldn't open the browser's image context menu
+    if (isEdgeHolding || state.holdTimer) {
+      e.preventDefault();
+    }
+  }
+
   // ─── Bind Events ──────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -407,6 +448,7 @@ export function setupDoubleTapDragZoom(
     window.addEventListener("pointercancel", handlePointerCancel, {
       capture: true,
     });
+    scrollWrap.addEventListener("contextmenu", handleContextMenu);
   }
 
   pswp.on("pointerDown", handlePswpPointerDown);
@@ -417,6 +459,9 @@ export function setupDoubleTapDragZoom(
   // ─── Cleanup ──────────────────────────────────────────────────────
 
   return () => {
+    // Don't end an active hold here: the hold owner may keep it going
+    // across PhotoSwipe instances (e.g. on page change)
+    isEdgeHolding = false;
     resetState(state);
 
     if (scrollWrap) {
@@ -432,6 +477,7 @@ export function setupDoubleTapDragZoom(
       window.removeEventListener("pointercancel", handlePointerCancel, {
         capture: true,
       });
+      scrollWrap.removeEventListener("contextmenu", handleContextMenu);
     }
 
     pswp.off("pointerDown", handlePswpPointerDown);
