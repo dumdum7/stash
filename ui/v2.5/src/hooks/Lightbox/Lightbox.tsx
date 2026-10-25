@@ -174,8 +174,6 @@ export const LightboxComponent: React.FC<IProps> = ({
 
   const slideshowDelay =
     savedDelay ?? configuredDelay ?? DEFAULT_SLIDESHOW_DELAY;
-  const slideshowDelayRef = useRef(slideshowDelay);
-  slideshowDelayRef.current = slideshowDelay;
 
   function setSlideshowDelay(v: number) {
     setLightboxSettings({ slideshowDelay: v });
@@ -254,46 +252,6 @@ export const LightboxComponent: React.FC<IProps> = ({
   );
 
   closeRef.current = close;
-
-  // Holding an edge region slideshows through images in that direction,
-  // using the slideshow delay. This lives outside the PhotoSwipe effect so
-  // that the hold survives PhotoSwipe being recreated on page change.
-  const edgeHoldIntervalRef = useRef<number>();
-
-  const stopEdgeHold = useCallback(() => {
-    if (edgeHoldIntervalRef.current === undefined) return;
-    window.clearInterval(edgeHoldIntervalRef.current);
-    edgeHoldIntervalRef.current = undefined;
-    window.removeEventListener("pointerup", stopEdgeHold, true);
-    window.removeEventListener("pointercancel", stopEdgeHold, true);
-    // resume the regular slideshow, if it's running
-    resetIntervalCallback.current?.();
-  }, []);
-
-  const startEdgeHold = useCallback(
-    (side: "left" | "right") => {
-      stopEdgeHold();
-      // pause the regular slideshow while holding
-      clearIntervalCallback.current?.();
-      const step = () =>
-        side === "left"
-          ? handleLeftRef.current?.(false)
-          : handleRightRef.current?.(false);
-      step();
-      edgeHoldIntervalRef.current = window.setInterval(
-        step,
-        slideshowDelayRef.current
-      );
-      window.addEventListener("pointerup", stopEdgeHold, true);
-      window.addEventListener("pointercancel", stopEdgeHold, true);
-    },
-    [stopEdgeHold]
-  );
-
-  useEffect(() => {
-    if (!isVisible) stopEdgeHold();
-    return stopEdgeHold;
-  }, [isVisible, stopEdgeHold]);
 
   useEffect(() => {
     if (!isVisible || images.length === 0) {
@@ -473,8 +431,6 @@ export const LightboxComponent: React.FC<IProps> = ({
     const cleanupDoubleTapDragZoom = setupDoubleTapDragZoom(pswp, {
       onEdgeTapLeft: () => handleLeftRef.current?.(),
       onEdgeTapRight: () => handleRightRef.current?.(),
-      onEdgeHoldStart: startEdgeHold,
-      onEdgeHoldEnd: stopEdgeHold,
       allowNavigation: () => allowNavigationRef.current,
     });
 
